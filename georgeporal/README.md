@@ -1,9 +1,24 @@
-# temporal-preso
+# georgeporal
 
-In-browser demo, plain TypeScript, no runtime dependencies.
+A tiny Temporal clone built up in stages, as a demo for a presentation on how
+the Temporal runtime works and where its footguns are. Plain TypeScript in the
+browser. georgeporal itself has no dependencies; the demo pages use highlight.js,
+served from `node_modules` so they work offline.
 
 ```
 npm install
-npm run dev     # tsc --watch
-npm run serve   # static server, open index.html
+npm start       # tsc --watch + static server, then open http://localhost:3000
 ```
+
+Every stage runs the same workflow: FizzBuzz to 1000, printing each value, then
+waiting a random 2-4 seconds.
+
+| Page           | Code          | What it adds                                                         |
+| -------------- | ------------- | -------------------------------------------------------------------- |
+| `stage-1.html` | `src/stage1/` | The workflow is a sync function; georgeporal just calls it           |
+| `stage-2.html` | `src/stage2/` | The workflow is an async generator; georgeporal loops over it        |
+| `stage-3.html` | `src/stage3/` | Unwound by hand, building an event history in localStorage           |
+| `stage-4.html` | `src/stage4/` | Resumable: replays the event history before doing anything for real  |
+
+Each page shows its own `workflow.ts` and `georgeporal.ts`, fetched live from
+`src/`, so what's on screen is the code that's running.

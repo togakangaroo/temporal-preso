@@ -3,10 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Temporal Preso</title>
+    <title>georgeporal</title>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="./dist/main.js"></script>
+    <h1>georgeporal</h1>
+    <p>A tiny Temporal clone, built up in stages. Every stage runs the same FizzBuzz workflow.</p>
+    <ol class="stages">
+      <li><a href="./stage-1.html">Sync function</a>: georgeporal just calls it</li>
+      <li><a href="./stage-2.html">Async iterable</a>: georgeporal loops over the commands it yields</li>
+      <li><a href="./stage-3.html">Event history</a>: unwound by hand, recorded to localStorage</li>
+      <li><a href="./stage-4.html">Replay</a>: resumes by replaying the history</li>
+    </ol>
   </body>
 </html>
