@@ -1,0 +1,16 @@
+{
+  "name": "temporal-preso",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch --preserveWatchOutput",
+    "serve": "npx --yes serve .",
+    "start": "concurrently -n tsc,serve -c blue,green \"npm:dev\" \"npm:serve\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.5",
+    "typescript": "^5.9.0"
+  }
+}
