@@ -9,6 +9,7 @@ const STAGES = [
   "Replay",
   "Activities",
   "Signals",
+  "Task queue",
 ];
 
 type PageOptions = {
@@ -17,6 +18,8 @@ type PageOptions = {
   tryThis: string;
   sources: { label: string; path: string }[];
   showHistory?: boolean;
+  showQueue?: boolean;
+  outputTitle?: string;
 };
 
 type RecordedEvent = {
@@ -78,7 +81,7 @@ export function describeEvent({ seq, command, result }: RecordedEvent): string {
 }
 
 export function mountPage(options: PageOptions) {
-  const { stage, blurb, tryThis, sources, showHistory } = options;
+  const { stage, blurb, tryThis, sources, showHistory, showQueue } = options;
   document.title = `Stage ${stage}: ${STAGES[stage - 1]}`;
 
   const start = el("button", { className: "primary" }, "Start");
@@ -86,6 +89,7 @@ export function mountPage(options: PageOptions) {
   const status = el("span", { className: "status" }, "idle");
   const output = el("div", { className: "log" });
   const history = el("div", { className: "log" });
+  const queue = el("div", { className: "log" });
 
   const crash = el("button", {}, "Crash (reload page)");
   crash.onclick = () => location.reload();
@@ -110,9 +114,10 @@ export function mountPage(options: PageOptions) {
   const runPanels = el(
     "div",
     { className: "column" },
-    panel("Output", output),
+    panel(options.outputTitle ?? "Output", output),
   );
   if (showHistory) runPanels.append(panel("Event history", history));
+  if (showQueue) runPanels.append(panel("Task queue", queue));
 
   const codePanels = el("div", { className: "column" });
   for (const { label, path } of sources) {
@@ -149,6 +154,10 @@ export function mountPage(options: PageOptions) {
     print: (text: string, className = "") => append(output, text, className),
     addEvent: (text: string, className = "") =>
       append(history, text, className),
+    setQueue: (lines: { text: string; className?: string }[]) =>
+      queue.replaceChildren(
+        ...lines.map(({ text, className = "" }) => el("div", { className }, text)),
+      ),
     onStart(run: () => Promise<void>) {
       start.onclick = async () => {
         start.disabled = true;

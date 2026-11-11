@@ -206,6 +206,10 @@ body:has(.panel.maximized) {
   color: var(--muted);
 }
 
+.mine {
+  color: var(--good);
+}
+
 .stored {
   color: var(--muted);
   font-style: italic;
