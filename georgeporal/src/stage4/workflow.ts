@@ -7,6 +7,6 @@ export async function* fizzbuzzWorkflow(): Execution {
     else if (n % 5 === 0) yield print("buzz");
     else yield print(String(n));
 
-    yield sleep(3000);
+    yield sleep(1500);
   }
 }

@@ -7,6 +7,6 @@ export async function* fizzbuzzWorkflow(): Execution {
     else if (n % 5 === 0) yield print("buzz");
     else yield print(String(n));
 
-    yield sleep(Math.round(2000 + Math.random() * 2000));
+    yield sleep(Math.round(1000 + Math.random() * 1000));
   }
 }

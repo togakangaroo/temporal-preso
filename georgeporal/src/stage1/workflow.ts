@@ -13,6 +13,6 @@ export function fizzbuzzWorkflow({ print }: Context) {
     else if (n % 5 === 0) print("buzz");
     else print(String(n));
 
-    sleep(2000 + Math.random() * 2000);
+    sleep(1000 + Math.random() * 1000);
   }
 }
