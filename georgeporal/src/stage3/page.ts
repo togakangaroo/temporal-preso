@@ -6,7 +6,7 @@ const page = mountPage({
   stage: 3,
   showHistory: true,
   blurb:
-    "georgeporal now unwinds the generator by hand. That lets it pass each command's result back in through next(result), and record every command and result to an event history in localStorage.",
+    "georgeporal now unwinds the generator by hand, recording every command it carries out to an event history in localStorage.",
   tryThis:
     "crash, and the history is still there. Press Start and it gets overwritten from 1: we've recorded everything but nothing reads it yet.",
   sources: [

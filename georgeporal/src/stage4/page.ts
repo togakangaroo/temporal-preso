@@ -1,20 +1,17 @@
 import { describeEvent, mountPage } from "../shared/page.js";
 import { clearHistory, loadHistory } from "../stage3/georgeporal.js";
-import { fizzbuzzWorkflow } from "../stage3/workflow.js";
 import { HISTORY_KEY, run } from "./georgeporal.js";
+import { fizzbuzzWorkflow } from "./workflow.js";
 
 const page = mountPage({
   stage: 4,
   showHistory: true,
   blurb:
-    "Same workflow as stage 3, not one line changed. Before doing anything real, georgeporal feeds the recorded results back through the generator. The workflow re-runs from line 1 and rebuilds its own local state, and the side effects are skipped.",
+    "Before doing anything real, georgeporal feeds the recorded results back through the generator with next(result). The workflow re-runs from line 1 and rebuilds its own local state, and the side effects are skipped. Randomness has to become a command now: a fresh Math.random() on replay wouldn't match the history.",
   tryThis:
     "crash, then Resume. Replay takes no time because no sleep really happens, and the count picks up where it left off. Then change the workflow's code and Resume again.",
   sources: [
-    {
-      label: "src/stage3/workflow.ts (unchanged)",
-      path: "./src/stage3/workflow.ts",
-    },
+    { label: "src/stage4/workflow.ts", path: "./src/stage4/workflow.ts" },
     { label: "src/stage4/georgeporal.ts", path: "./src/stage4/georgeporal.ts" },
   ],
 });

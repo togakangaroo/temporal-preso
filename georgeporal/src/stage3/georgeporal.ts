@@ -1,19 +1,13 @@
 export type Command =
   | { type: "print"; text: string }
-  | { type: "random"; min: number; max: number }
   | { type: "sleep"; ms: number };
 
-export type HistoryEvent = { seq: number; command: Command; result?: unknown };
-export type Execution = AsyncGenerator<Command, void, any>;
+export type HistoryEvent = { seq: number; command: Command };
+export type Execution = AsyncGenerator<Command, void, void>;
 export type Workflow = () => Execution;
 
 export const print = (text: string): Command => ({ type: "print", text });
 export const sleep = (ms: number): Command => ({ type: "sleep", ms });
-export const random = (min: number, max: number): Command => ({
-  type: "random",
-  min,
-  max,
-});
 
 const HISTORY_KEY = "georgeporal:stage3:history";
 
@@ -24,14 +18,10 @@ export function loadHistory(key = HISTORY_KEY): HistoryEvent[] {
 export async function execute(
   command: Command,
   output: (text: string) => void,
-): Promise<unknown> {
+): Promise<void> {
   switch (command.type) {
     case "print":
       return output(command.text);
-    case "random":
-      return Math.round(
-        command.min + Math.random() * (command.max - command.min),
-      );
     case "sleep":
       return new Promise<void>((resolve) => setTimeout(resolve, command.ms));
   }
@@ -44,18 +34,16 @@ export async function run(
 ): Promise<void> {
   const history: HistoryEvent[] = [];
   const execution = workflow();
-  let result: unknown;
 
-  // for-await can't hand a value back to the workflow; next(result) can.
   let step = await execution.next();
   while (!step.done) {
-    result = await execute(step.value, output);
+    await execute(step.value, output);
 
-    const event = { seq: history.length + 1, command: step.value, result };
+    const event = { seq: history.length + 1, command: step.value };
     history.push(event);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     onEvent(event);
-    step = await execution.next(result);
+    step = await execution.next();
   }
 }
 
