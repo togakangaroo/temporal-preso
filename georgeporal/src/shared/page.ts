@@ -29,8 +29,31 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 function panel(title: string, body: HTMLElement): HTMLElement {
-  return el("section", { className: "panel" }, el("h2", {}, title), body);
+  const toggle = el(
+    "button",
+    { className: "expand", title: "Maximize", ariaLabel: "Maximize" },
+    "🗖",
+  );
+  const section = el(
+    "section",
+    { className: "panel" },
+    el("h2", {}, title, toggle),
+    body,
+  );
+  toggle.onclick = () => {
+    const maximized = section.classList.toggle("maximized");
+    toggle.textContent = maximized ? "🗕" : "🗖";
+    toggle.title = toggle.ariaLabel = maximized ? "Minimize" : "Maximize";
+    // Resizing a log moves it off the bottom, which would stop it following output.
+    if (body.classList.contains("log")) body.scrollTop = body.scrollHeight;
+  };
+  return section;
 }
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  document.querySelector<HTMLElement>(".panel.maximized .expand")?.click();
+});
 
 function append(log: HTMLElement, text: string, className: string): void {
   const pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
