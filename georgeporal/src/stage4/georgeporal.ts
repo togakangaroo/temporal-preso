@@ -16,12 +16,9 @@ export async function run(
   const execution = workflow();
   let cursor = 0;
   let result: unknown;
+  let step = await execution.next();
 
-  for (
-    let step = await execution.next();
-    !step.done;
-    step = await execution.next(result)
-  ) {
+  while (!step.done) {
     const recorded = history[cursor];
 
     if (recorded) {
@@ -29,29 +26,29 @@ export async function run(
       if (JSON.stringify(recorded.command) !== JSON.stringify(step.value)) {
         throw new Error(
           `Nondeterminism at event #${recorded.seq}: history has ` +
-            `${JSON.stringify(recorded.command)}, workflow yielded ` +
-            `${JSON.stringify(step.value)}`,
+          `${JSON.stringify(recorded.command)}, workflow yielded ` +
+          `${JSON.stringify(step.value)}`,
         );
       }
       result = recorded.result;
-      cursor++;
       onEvent(recorded, true);
-      continue;
+    } else {
+      result = await execute(step.value, output);
+
+      const event = { seq: history.length + 1, command: step.value, result };
+      history.push(event);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      onEvent(event, false);
     }
 
-    result = await execute(step.value, output);
-
-    const event = { seq: history.length + 1, command: step.value, result };
-    history.push(event);
     cursor++;
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-    onEvent(event, false);
+    step = await execution.next(result);
   }
 
   if (cursor < history.length) {
     throw new Error(
       `Nondeterminism: workflow finished with ` +
-        `${history.length - cursor} events left in its history`,
+      `${history.length - cursor} events left in its history`,
     );
   }
 }

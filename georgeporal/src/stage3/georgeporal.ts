@@ -47,17 +47,15 @@ export async function run(
   let result: unknown;
 
   // for-await can't hand a value back to the workflow; next(result) can.
-  for (
-    let step = await execution.next();
-    !step.done;
-    step = await execution.next(result)
-  ) {
+  let step = await execution.next();
+  while (!step.done) {
     result = await execute(step.value, output);
 
     const event = { seq: history.length + 1, command: step.value, result };
     history.push(event);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     onEvent(event);
+    step = await execution.next(result);
   }
 }
 
