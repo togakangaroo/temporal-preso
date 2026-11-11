@@ -1,9 +1,9 @@
 export type Context = {
-  print(text: object): void;
+  print(text: string): void;
 };
 
 export type Workflow = (context: Context) => void;
 
-export function run(workflow: Workflow, print: (text: object) => void): void {
+export function run(workflow: Workflow, print: (text: string) => void): void {
   workflow({ print });
 }
