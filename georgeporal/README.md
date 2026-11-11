@@ -11,7 +11,7 @@ npm start       # tsc --watch + static server, then open http://localhost:3000
 ```
 
 Every stage runs the same workflow: FizzBuzz to 1000, printing each value, then
-waiting a random 2-4 seconds (a fixed 3 seconds in stage 4, so replay matches).
+waiting a random 1-2 seconds (a fixed 1.5 seconds in stage 4, so replay matches).
 
 | Page           | Code          | What it adds                                                         |
 | -------------- | ------------- | -------------------------------------------------------------------- |
@@ -19,6 +19,7 @@ waiting a random 2-4 seconds (a fixed 3 seconds in stage 4, so replay matches).
 | `stage-2.html` | `src/stage2/` | The workflow is an async generator; georgeporal loops over it        |
 | `stage-3.html` | `src/stage3/` | Unwound by hand, building an event history in localStorage           |
 | `stage-4.html` | `src/stage4/` | Resumable: replays the event history before doing anything for real  |
+| `stage-5.html` | `src/stage5/` | Activities: async functions whose results are recorded and replayed  |
 
 Each page shows its own `workflow.ts` and `georgeporal.ts`, fetched live from
 `src/`, so what's on screen is the code that's running.

@@ -2,7 +2,13 @@
 
 import { highlight } from "./highlight.js";
 
-const STAGES = ["Sync function", "Async iterable", "Event history", "Replay"];
+const STAGES = [
+  "Sync function",
+  "Async iterable",
+  "Event history",
+  "Replay",
+  "Activities",
+];
 
 type PageOptions = {
   stage: number;
