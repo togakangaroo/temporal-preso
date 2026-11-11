@@ -12,7 +12,7 @@ export async function* fizzbuzzWorkflow(): Execution {
     n = newNum;
   });
 
-  while (n <= 1000) {
+  while (true) {
     if (n % 15 === 0) yield print("fizzbuzz");
     else if (n % 3 === 0) yield print("fizz");
     else if (n % 5 === 0) yield print("buzz");

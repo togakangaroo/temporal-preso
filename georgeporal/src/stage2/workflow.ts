@@ -1,11 +1,13 @@
 import { print, sleep, type Command } from "./georgeporal.js";
 
 export async function* fizzbuzzWorkflow(): AsyncGenerator<Command> {
-  for (let n = 1; n <= 1000; n++) {
+  let n = 1;
+  while (true) {
     if (n % 15 === 0) yield print("fizzbuzz");
     else if (n % 3 === 0) yield print("fizz");
     else if (n % 5 === 0) yield print("buzz");
     else yield print(String(n));
+    n++;
 
     yield sleep(1000 + Math.random() * 1000);
   }

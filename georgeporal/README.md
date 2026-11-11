@@ -10,7 +10,7 @@ npm install
 npm start       # tsc --watch + static server, then open http://localhost:3000
 ```
 
-Every stage runs the same workflow: FizzBuzz to 1000, printing each value, then
+Every stage runs the same workflow: FizzBuzz (to 1000 in stage 1, forever after), printing each value, then
 waiting a random 1-2 seconds (a fixed 1.5 seconds in stage 4, so replay matches).
 
 | Page           | Code          | What it adds                                                         |
