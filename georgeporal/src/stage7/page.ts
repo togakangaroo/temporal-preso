@@ -25,6 +25,31 @@ const page = mountPage({
     "georgeporal stops carrying out commands itself. Each one becomes a task on a queue in localStorage, and every open tab runs a worker that polls that queue ten times a second. Taking a task off the queue happens under a Web Lock, so two tabs can never grab the same one. A worker's start and finish go into the history as taskStarted and taskCompleted.",
   tryThis:
     "open this page in a second tab and leave it alone, then Start here. Each line prints in whichever tab's worker took the task. Crash the other tab mid-sleep: about 5 seconds later its task times out and a worker here takes it over.",
+  explainer: [
+    {
+      heading: "What's going on",
+      body: [
+        "georgeporal no longer carries out commands itself. Each command, and each activity call, becomes a task on a shared queue in localStorage, and georgeporal polls until the task is done. Every open tab runs a worker that polls the same queue ten times a second, takes a task, runs it, and marks it finished. Each line prints in whichever tab's worker took the task, and the tasks that are yours show in green.",
+        "Taking a task is a read-modify-write of one localStorage key, and any tab could slip its own write in between. `updateQueue` wraps every change in a Web Lock (`navigator.locks.request`), which is held across every tab on the origin, so no two workers can grab the same task.",
+        "When georgeporal sees a worker take a task, it records `taskStarted` with that worker's name, then `taskCompleted` with the result. Replay compares only the fields the workflow can know, so which worker ran a task is just something to read back.",
+        "If a task is still unfinished 5 seconds after a worker took it, that worker is assumed lost, and any worker may take the task again. Close a tab in the middle of a sleep to watch that happen.",
+      ],
+    },
+    {
+      heading: "How it maps to Temporal",
+      body: [
+        "This is how Temporal actually runs work. The server never calls your code. Workers long-poll named task queues and pull work when they have room for it. To scale, you start more workers. To route work, you name queues. Workers can run anywhere that can reach the server.",
+        "Temporal finds lost workers with timeouts: start-to-close, schedule-to-start and heartbeat timeouts. When one fires, the activity is retried somewhere else. So activities run at least once, which means they should be idempotent.",
+        "Two simplifications here. In real Temporal, workflow code also runs on workers, as workflow tasks, and is replayed on whichever worker picks it up. Here it stays in the tab that pressed Start. And sleeps are server-side timers, not tasks a worker has to wait out.",
+      ],
+    },
+    {
+      heading: "What breaks",
+      body: [
+        "Press Start in two tabs and you have two georgeporals writing one history. Temporal's server prevents that by owning the history and handing out one workflow task at a time. Also, a slow worker that isn't actually dead can still finish its task after the timeout has given it to someone else. That's the at-least-once caveat in action.",
+      ],
+    },
+  ],
   sources: [
     { label: "src/stage7/workflow.ts", path: "./src/stage7/workflow.ts" },
     { label: "src/stage7/georgeporal.ts", path: "./src/stage7/georgeporal.ts" },

@@ -215,6 +215,28 @@ body:has(.panel.maximized) {
   font-style: italic;
 }
 
+.explainer {
+  margin-top: 48px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.explainer h3 {
+  margin: 24px 0 6px;
+  font-size: 20px;
+}
+
+.explainer p {
+  margin: 8px 0;
+}
+
+.explainer code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--panel);
+  font: 0.9em var(--mono);
+}
+
 ol.stages li {
   margin: 10px 0;
 }

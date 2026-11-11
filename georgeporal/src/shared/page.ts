@@ -20,6 +20,8 @@ type PageOptions = {
   showHistory?: boolean;
   showQueue?: boolean;
   outputTitle?: string;
+  // Below the fold: what this stage demonstrates. `backticks` become <code>.
+  explainer: { heading: string; body: string[] }[];
 };
 
 type RecordedEvent = {
@@ -64,6 +66,12 @@ document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   document.querySelector<HTMLElement>(".panel.maximized .expand")?.click();
 });
+
+function prose(text: string): (Node | string)[] {
+  return text
+    .split("`")
+    .map((part, i) => (i % 2 ? el("code", {}, part) : part));
+}
 
 function append(log: HTMLElement, text: string, className: string): void {
   const pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
@@ -135,6 +143,14 @@ export function mountPage(options: PageOptions) {
     el("p", { className: "try" }, el("strong", {}, "Try this: "), tryThis),
     controls,
     el("main", {}, runPanels, codePanels),
+    el(
+      "article",
+      { className: "explainer" },
+      ...options.explainer.flatMap(({ heading, body }) => [
+        el("h3", {}, heading),
+        ...body.map((paragraph) => el("p", {}, ...prose(paragraph))),
+      ]),
+    ),
   );
 
   const setStatus = (text: string, className = "") => {
