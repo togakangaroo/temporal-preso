@@ -67,6 +67,20 @@ document.addEventListener("keydown", (event) => {
   document.querySelector<HTMLElement>(".panel.maximized .expand")?.click();
 });
 
+// In maximized code, holding a group's letter fades every line outside that group.
+document.addEventListener("keydown", (event) => {
+  if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (!/^[a-z]$/.test(event.key)) return;
+  const code = document.querySelector<HTMLElement>(".panel.maximized pre");
+  if (code?.querySelector(`.group-${event.key}`)) code.dataset.focus = event.key;
+});
+const clearFocus = () =>
+  document.querySelectorAll<HTMLElement>("pre[data-focus]").forEach((code) => {
+    delete code.dataset.focus;
+  });
+document.addEventListener("keyup", clearFocus);
+window.addEventListener("blur", clearFocus);
+
 function prose(text: string): (Node | string)[] {
   return text
     .split("`")

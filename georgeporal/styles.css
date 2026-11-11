@@ -184,12 +184,22 @@ pre .line {
   min-height: 1.5em;
 }
 
-pre .group-a { background: rgb(110 160 255 / 0.22); }
-pre .group-b { background: rgb(190 130 255 / 0.22); }
-pre .group-c { background: rgb(120 210 160 / 0.2); }
-pre .group-d { background: rgb(255 190 100 / 0.2); }
-pre .group-e { background: rgb(255 120 140 / 0.2); }
-pre .group-f { background: rgb(90 210 230 / 0.2); }
+pre .group-q { background: rgb(120 210 160 / 0.2); }
+pre .group-w { background: rgb(255 190 100 / 0.2); }
+pre .group-e { background: rgb(190 130 255 / 0.22); }
+pre .group-r { background: rgb(255 120 140 / 0.2); }
+pre .group-t { background: rgb(110 160 255 / 0.22); }
+pre .group-y { background: rgb(90 210 230 / 0.2); }
+
+/* Holding a group's letter in maximized code (see page.ts). */
+pre[data-focus="q"] .line:not(.group-q),
+pre[data-focus="w"] .line:not(.group-w),
+pre[data-focus="e"] .line:not(.group-e),
+pre[data-focus="r"] .line:not(.group-r),
+pre[data-focus="t"] .line:not(.group-t),
+pre[data-focus="y"] .line:not(.group-y) {
+  opacity: 0.5;
+}
 
 .panel.maximized pre .lines {
   counter-reset: line;

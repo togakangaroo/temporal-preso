@@ -1,56 +1,56 @@
 // <token_keys>
-// b: replaying history
-// c: running commands
-// d: recording history
+// q: running commands
+// w: recording history
+// e: replaying history
 // </token_keys>
-import { zipLongest } from "../shared/zipLongest.js";                           // b
-import {                                                                        // c
-  execute,                                                                      // c
-  loadHistory,                                                                  // d
-  type HistoryEvent,                                                            // d
-  type Workflow,                                                                // c
-} from "../stage3/georgeporal.js";                                              // c
+import { zipLongest } from "../shared/zipLongest.js";                           // e
+import {                                                                        // q
+  execute,                                                                      // q
+  loadHistory,                                                                  // w
+  type HistoryEvent,                                                            // w
+  type Workflow,                                                                // q
+} from "../stage3/georgeporal.js";                                              // q
 
-export const HISTORY_KEY = "georgeporal:stage4:history";                        // d
+export const HISTORY_KEY = "georgeporal:stage4:history";                        // w
 
-export async function run(                                                      // c
-  workflow: Workflow,                                                           // c
-  output: (text: string) => void,                                               // c
-  onEvent: (event: HistoryEvent, replayed: boolean) => void,                    // c
-): Promise<void> {                                                              // c
-  const history = loadHistory(HISTORY_KEY);                                     // d
-  // Zip a copy, since we append to history as we go.                           // b
-  const steps = zipLongest([...history], workflow());                           // b
-  let step = await steps.next();                                                // b
+export async function run(                                                      // q
+  workflow: Workflow,                                                           // q
+  output: (text: string) => void,                                               // q
+  onEvent: (event: HistoryEvent, replayed: boolean) => void,                    // q
+): Promise<void> {                                                              // q
+  const history = loadHistory(HISTORY_KEY);                                     // w
+  // Zip a copy, since we append to history as we go.                           // e
+  const steps = zipLongest([...history], workflow());                           // e
+  let step = await steps.next();                                                // e
 
-  while (!step.done) {                                                          // c
-    const [recorded, command] = step.value;                                     // b
+  while (!step.done) {                                                          // q
+    const [recorded, command] = step.value;                                     // e
 
-    if (!command) {                                                             // b
-      throw new Error(                                                          // b
-        `Nondeterminism: workflow finished before event #${recorded?.seq}`,     // b
-      );                                                                        // b
-    }                                                                           // b
+    if (!command) {                                                             // e
+      throw new Error(                                                          // e
+        `Nondeterminism: workflow finished before event #${recorded?.seq}`,     // e
+      );                                                                        // e
+    }                                                                           // e
 
-    if (recorded) {                                                             // b
-      // Replay: same command as last time? Then it already happened, skip it.  // b
-      if (JSON.stringify(recorded.command) !== JSON.stringify(command)) {       // b
-        throw new Error(                                                        // b
-          `Nondeterminism at event #${recorded.seq}: history has ` +            // b
-          `${JSON.stringify(recorded.command)}, workflow yielded ` +            // b
-          `${JSON.stringify(command)}`,                                         // b
-        );                                                                      // b
-      }                                                                         // b
-      onEvent(recorded, true);                                                  // b
-    } else {                                                                    // c
-      await execute(command, output);                                           // c
+    if (recorded) {                                                             // e
+      // Replay: same command as last time? Then it already happened, skip it.  // e
+      if (JSON.stringify(recorded.command) !== JSON.stringify(command)) {       // e
+        throw new Error(                                                        // e
+          `Nondeterminism at event #${recorded.seq}: history has ` +            // e
+          `${JSON.stringify(recorded.command)}, workflow yielded ` +            // e
+          `${JSON.stringify(command)}`,                                         // e
+        );                                                                      // e
+      }                                                                         // e
+      onEvent(recorded, true);                                                  // e
+    } else {                                                                    // q
+      await execute(command, output);                                           // q
 
-      const event = { seq: history.length + 1, command };                       // d
-      history.push(event);                                                      // d
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));               // d
-      onEvent(event, false);                                                    // d
-    }                                                                           // c
+      const event = { seq: history.length + 1, command };                       // w
+      history.push(event);                                                      // w
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));               // w
+      onEvent(event, false);                                                    // w
+    }                                                                           // q
 
-    step = await steps.next();                                                  // c
-  }                                                                             // c
-}                                                                               // c
+    step = await steps.next();                                                  // q
+  }                                                                             // q
+}                                                                               // q

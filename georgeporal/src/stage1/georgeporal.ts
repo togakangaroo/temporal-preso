@@ -1,12 +1,12 @@
 // <token_keys>
-// c: running commands
+// q: running commands
 // </token_keys>
-export type Context = {                                                         // c
-  print(text: string): void;                                                    // c
-};                                                                              // c
+export type Context = {                                                         // q
+  print(text: string): void;                                                    // q
+};                                                                              // q
 
-export type Workflow = (context: Context) => void;                              // c
+export type Workflow = (context: Context) => void;                              // q
 
-export function run(workflow: Workflow, print: (text: string) => void): void {  // c
-  workflow({ print });                                                          // c
-}                                                                               // c
+export function run(workflow: Workflow, print: (text: string) => void): void {  // q
+  workflow({ print });                                                          // q
+}                                                                               // q

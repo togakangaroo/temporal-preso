@@ -1,27 +1,27 @@
 // <token_keys>
-// c: running commands
+// q: running commands
 // </token_keys>
-export type Command =                                                       // c
-  | { type: "print"; text: string }                                         // c
-  | { type: "sleep"; ms: number };                                          // c
+export type Command =                                                       // q
+  | { type: "print"; text: string }                                         // q
+  | { type: "sleep"; ms: number };                                          // q
 
-export type Workflow = () => AsyncIterable<Command>;                        // c
+export type Workflow = () => AsyncIterable<Command>;                        // q
 
-export const print = (text: string): Command => ({ type: "print", text });  // c
-export const sleep = (ms: number): Command => ({ type: "sleep", ms });      // c
+export const print = (text: string): Command => ({ type: "print", text });  // q
+export const sleep = (ms: number): Command => ({ type: "sleep", ms });      // q
 
-export async function run(                                                  // c
-  workflow: Workflow,                                                       // c
-  output: (text: string) => void,                                           // c
-): Promise<void> {                                                          // c
-  for await (const command of workflow()) {                                 // c
-    switch (command.type) {                                                 // c
-      case "print":                                                         // c
-        output(command.text);                                               // c
-        break;                                                              // c
-      case "sleep":                                                         // c
-        await new Promise((resolve) => setTimeout(resolve, command.ms));    // c
-        break;                                                              // c
-    }                                                                       // c
-  }                                                                         // c
-}                                                                           // c
+export async function run(                                                  // q
+  workflow: Workflow,                                                       // q
+  output: (text: string) => void,                                           // q
+): Promise<void> {                                                          // q
+  for await (const command of workflow()) {                                 // q
+    switch (command.type) {                                                 // q
+      case "print":                                                         // q
+        output(command.text);                                               // q
+        break;                                                              // q
+      case "sleep":                                                         // q
+        await new Promise((resolve) => setTimeout(resolve, command.ms));    // q
+        break;                                                              // q
+    }                                                                       // q
+  }                                                                         // q
+}                                                                           // q
