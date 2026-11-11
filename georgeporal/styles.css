@@ -90,6 +90,20 @@ button {
   cursor: pointer;
 }
 
+input {
+  width: 8em;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+input:disabled {
+  opacity: 0.45;
+}
+
 button.primary {
   border-color: var(--accent);
   background: var(--accent);

@@ -8,6 +8,7 @@ const STAGES = [
   "Event history",
   "Replay",
   "Activities",
+  "Signals",
 ];
 
 type PageOptions = {
@@ -70,7 +71,9 @@ function append(log: HTMLElement, text: string, className: string): void {
 export function describeEvent({ seq, command, result }: RecordedEvent): string {
   const { type, ...args } = command;
   const returned = result === undefined ? "" : ` → ${JSON.stringify(result)}`;
-  const shownArgs = Object.values(args).map((arg) => JSON.stringify(arg));
+  const shownArgs = Object.values(args)
+    .filter((arg) => arg !== undefined)
+    .map((arg) => JSON.stringify(arg));
   return `#${seq} ${type}(${shownArgs.join(", ")})${returned}`;
 }
 
@@ -141,6 +144,7 @@ export function mountPage(options: PageOptions) {
       const button = el("button", {}, label);
       button.onclick = onClick;
       crash.before(button);
+      return button;
     },
     print: (text: string, className = "") => append(output, text, className),
     addEvent: (text: string, className = "") =>

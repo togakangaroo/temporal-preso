@@ -20,6 +20,7 @@ waiting a random 1-2 seconds (a fixed 1.5 seconds in stage 4, so replay matches)
 | `stage-3.html` | `src/stage3/` | Unwound by hand, building an event history in localStorage           |
 | `stage-4.html` | `src/stage4/` | Resumable: replays the event history before doing anything for real  |
 | `stage-5.html` | `src/stage5/` | Activities: async functions whose results are recorded and replayed  |
+| `stage-6.html` | `src/stage6/` | Signals: outside input, recorded in history, handlers re-run on replay |
 
 Each page shows its own `workflow.ts` and `georgeporal.ts`, fetched live from
 `src/`, so what's on screen is the code that's running.
