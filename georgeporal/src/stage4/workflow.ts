@@ -1,4 +1,4 @@
-import { print, random, sleep, type Execution } from "./georgeporal.js";
+import { print, sleep, type Execution } from "../stage3/georgeporal.js";
 
 export async function* fizzbuzzWorkflow(): Execution {
   for (let n = 1; n <= 1000; n++) {
@@ -7,7 +7,6 @@ export async function* fizzbuzzWorkflow(): Execution {
     else if (n % 5 === 0) yield print("buzz");
     else yield print(String(n));
 
-    const ms: number = yield random(2000, 4000);
-    yield sleep(ms);
+    yield sleep(3000);
   }
 }

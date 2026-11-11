@@ -7,7 +7,7 @@ const page = mountPage({
   stage: 4,
   showHistory: true,
   blurb:
-    "Before doing anything real, georgeporal feeds the recorded results back through the generator with next(result). The workflow re-runs from line 1 and rebuilds its own local state, and the side effects are skipped. Randomness has to become a command now: a fresh Math.random() on replay wouldn't match the history.",
+    "Before doing anything real, georgeporal walks the recorded history alongside the generator. The workflow re-runs from line 1 and rebuilds its own local state, and the side effects are skipped. The sleep is a fixed 3 seconds now: a fresh Math.random() on replay wouldn't match the history.",
   tryThis:
     "crash, then Resume. Replay takes no time because no sleep really happens, and the count picks up where it left off. Then change the workflow's code and Resume again.",
   sources: [
