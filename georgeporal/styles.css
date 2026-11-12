@@ -374,6 +374,12 @@ ol.stages li {
   transform: rotate(-4deg);
 }
 
+.qr {
+  width: clamp(120px, 18vw, 200px);
+  height: auto;
+  margin-top: 12px;
+}
+
 .backdrop {
   position: absolute;
   inset: 0;
