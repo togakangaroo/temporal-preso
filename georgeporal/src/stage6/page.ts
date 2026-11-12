@@ -43,8 +43,8 @@ const page = mountPage({
   ],
 });
 
-function describe({ seq, ...command }: HistoryEvent): string {
-  return describeEvent({ seq, command });
+function describe({ seq, result, ...command }: HistoryEvent): string {
+  return describeEvent({ seq, command, result });
 }
 
 const input = Object.assign(document.createElement("input"), {

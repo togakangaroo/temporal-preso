@@ -1,5 +1,5 @@
-import { print, sleep, type Execution } from "../stage3/georgeporal.js";
-import { callActivity, onSignal } from "./georgeporal.js";
+import { print, sleep } from "../stage3/georgeporal.js";
+import { callActivity, onSignal, type Execution } from "./georgeporal.js";
 
 export async function generateRandomNumberActivity(min: number, max: number) {
   return Math.round(min + Math.random() * (max - min));
@@ -19,7 +19,7 @@ export async function* fizzbuzzWorkflow(): Execution {
     else yield print(String(n));
     n++;
 
-    const ms = await callActivity(generateRandomNumberActivity, [1000, 2000]);
+    const ms: number = yield callActivity(generateRandomNumberActivity, [1000, 2000]);
     yield sleep(ms);
   }
 }

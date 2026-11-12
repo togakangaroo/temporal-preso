@@ -41,7 +41,7 @@ export async function startWorker(
 
     const { command } = task;
     const result =
-      command.type === "activity"
+      command.type === "callActivity"
         ? await activities[command.activity](...command.args)
         : await execute(command, output);
     await finish(task.id, result);

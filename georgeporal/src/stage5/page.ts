@@ -19,21 +19,21 @@ const page = mountPage({
     {
       heading: "What's going on",
       body: [
-        "An activity is a plain async function, here one that picks a random number. The workflow doesn't call it directly. It yields `callActivity(fn, args)`, a command just like `print` and `sleep`. `execute` runs the function, and the result is recorded alongside the command.",
-        "On replay, `run` finds the command already in the history and hands back the recorded result without calling `execute`. The function never runs. The randomness happened once. Replay just reads back what it was.",
-        "The result comes back into the workflow through `yield` itself, so `const ms = yield callActivity(...)` gets the number.",
+        "An activity is a plain async function, these are free to be non-deterministic, indeed ours just picks a random number. Rather than call the function directly, the workflow creates a `callActivity` command indicating that we would like to run that function. Our framework then runs the command recording `activityStarted` and `activityCompleted` events including the result.",
+        "On replay, `run` finds both events already in the history and treats the function call as memoized, returning back the recorded result; the function never runs after its first success. In this way, even non-deterministic code can fit into our scheme.",
       ],
     },
     {
       heading: "How it maps to Temporal",
       body: [
-        "This is the core split in Temporal. Workflows are deterministic orchestration, and activities are everything else: network calls, databases, randomness, anything that can fail or vary. An activity's result is stored in the Event History, and replay reads that result instead of running the activity again. Real activities also get retries and timeouts.",
+        "This is the core split in Temporal. Workflows are deterministic orchestration, and activities are everything else: network calls, databases, randomness, anything that can fail or vary. An activity's result is stored in the Event History, and replay reads that result instead of running the activity again. Real activities also get retries and timeouts. You can hopefully see how implementing that becomes very easy for a system like this.",
       ],
     },
     {
-      heading: "What breaks",
+      heading: "So that's it then?",
       body: [
-        "Replay still compares the activity's name and args. Change the args in the workflow and Resume, and you get a nondeterminism error. Results also have to be serializable, because they live in the history. In real Temporal, big results bloat the history, and there are size limits.",
+        "Full durability, isn't that neat?",
+        "There's more though, lets see what else we can get this setup to do.",
       ],
     },
   ],

@@ -6,12 +6,15 @@
 // t: signals
 // y: task queue
 // </token_keys>
-import type { Command, Workflow } from "../stage3/georgeporal.js";                 // q
+import type { Command } from "../stage3/georgeporal.js";                           // q
 
 // Anything a worker can be asked to do.                                           // y
 export type TaskCommand =                                                          // y
   | Command                                                                        // q
-  | { type: "activity"; activity: string; args: unknown[] };                       // r
+  | { type: "callActivity"; activity: string; args: unknown[] };                   // r
+
+export type Execution = AsyncGenerator<TaskCommand, void, any>;                    // q
+export type Workflow = () => Execution;                                            // q
 
 type Entry =                                                                       // w
   | TaskCommand                                                                    // y
@@ -166,13 +169,10 @@ export function sendSignal(signal: string, arg: unknown): void {                
 
 // Only the activity's name goes on the queue. Whichever worker picks it up        // r
 // has to have registered an activity by that name.                                // r
-export async function callActivity<Args extends unknown[], Result>(                // r
-  activity: (...args: Args) => Promise<Result>,                                    // r
-  args: Args,                                                                      // r
-): Promise<Result> {                                                               // r
-  const command = { type: "activity" as const, activity: activity.name, args };    // r
-  return (await perform(command)) as Result;                                       // r
-}                                                                                  // r
+export const callActivity = (                                                      // r
+  activity: (...args: any[]) => Promise<unknown>,                                  // r
+  args: unknown[],                                                                 // r
+): TaskCommand => ({ type: "callActivity", activity: activity.name, args });       // r
 
 export async function run(                                                         // q
   workflow: Workflow,                                                              // q
@@ -183,8 +183,10 @@ export async function run(                                                      
   notify = onEvent;                                                                // w
   handlers.clear();                                                                // t
 
-  for await (const command of workflow()) {                                        // q
-    await perform(command);                                                        // q
+  const execution = workflow();                                                    // q
+  let next = await execution.next();                                               // q
+  while (!next.done) {                                                             // q
+    next = await execution.next(await perform(next.value));                        // q
   }                                                                                // q
 
   replaySignals();                                                                 // t

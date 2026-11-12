@@ -5,137 +5,168 @@
 // r: activities
 // t: signals
 // </token_keys>
-import { execute, type Command, type Workflow } from "../stage3/georgeporal.js";      // q
+export type Activity = (...args: any[]) => Promise<unknown>;                            // r
 
-type Entry =                                                                          // w
-  | Command                                                                           // q
-  | { type: "activityStarted"; activity: string; args: unknown[] }                    // r
-  | { type: "activityCompleted"; activity: string; result?: unknown }                 // r
-  | { type: "signalReceived"; signal: string; arg: unknown }                          // t
-  | { type: "signalHandled"; signal: string; result?: unknown };                      // t
+export type Command =                                                                   // q
+  | { type: "print"; text: string }                                                     // q
+  | { type: "sleep"; ms: number }                                                       // q
+  | { type: "callActivity"; activity: Activity; args: unknown[] };                      // r
 
-export type HistoryEvent = Entry & { seq: number };                                   // w
-type OnEvent = (event: HistoryEvent, replayed: boolean) => void;                      // w
-type SignalHandler = (arg: any) => unknown;                                           // t
+export type Execution = AsyncGenerator<Command, void, any>;                             // q
+export type Workflow = () => Execution;                                                 // q
 
-export const HISTORY_KEY = "georgeporal:stage6:history";                              // w
+export const print = (text: string): Command => ({ type: "print", text });              // q
+export const sleep = (ms: number): Command => ({ type: "sleep", ms });                  // q
+export const callActivity = (activity: Activity, args: unknown[]): Command =>           // r
+  ({ type: "callActivity", activity, args });                                           // r
 
-export function loadHistory(): HistoryEvent[] {                                       // w
-  return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");                       // w
-}                                                                                     // w
+type Entry =                                                                            // w
+  | { type: "print"; text: string }                                                     // q
+  | { type: "sleep"; ms: number }                                                       // q
+  | { type: "activityStarted"; activity: string; args: unknown[] }                      // r
+  | { type: "activityCompleted"; activity: string; result?: unknown }                   // r
+  | { type: "signalReceived"; signal: string; arg: unknown }                            // t
+  | { type: "signalHandled"; signal: string; result?: unknown };                        // t
 
-let history: HistoryEvent[] = [];                                                     // w
-let cursor = 0;                                                                       // e
-let notify: OnEvent = () => {};                                                       // w
-const handlers = new Map<string, SignalHandler>();                                    // t
+export type HistoryEvent = Entry & { seq: number; result?: unknown };                   // w
+type OnEvent = (event: HistoryEvent, replayed: boolean) => void;                        // w
+type SignalHandler = (arg: any) => unknown;                                             // t
 
-function callHandler(signal: string, arg: unknown): unknown {                         // t
-  const handler = handlers.get(signal);                                               // t
-  if (!handler) throw new Error(`No handler for signal "${signal}"`);                 // t
-  return handler(arg);                                                                // t
-}                                                                                     // t
+export const HISTORY_KEY = "georgeporal:stage6:history";                                // w
 
-// A signal landed at this exact point last time, so its handler runs here again.     // t
-function replaySignals(): void {                                                      // t
-  let event = history[cursor];                                                        // t
-  while (event?.type === "signalReceived") {                                          // t
-    const { signal, arg } = event;                                                    // t
-    cursor++;                                                                         // t
-    notify(event, true);                                                              // t
+export function loadHistory(): HistoryEvent[] {                                         // w
+  return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");                         // w
+}                                                                                       // w
 
-    const handled: Entry = {                                                          // t
-      type: "signalHandled",                                                          // t
-      signal,                                                                         // t
-      result: callHandler(signal, arg),                                               // t
-    };                                                                                // t
-    if (!replay(handled)) record(handled);                                            // e
-    event = history[cursor];                                                          // t
-  }                                                                                   // t
-}                                                                                     // t
+let history: HistoryEvent[] = [];                                                       // w
+let cursor = 0;                                                                         // e
+let notify: OnEvent = () => {};                                                         // w
+const handlers = new Map<string, SignalHandler>();                                      // t
 
-// Returns the next recorded event if we're still replaying, otherwise undefined.     // e
-function replay(expected: Entry): HistoryEvent | undefined {                          // e
-  if (expected.type !== "signalHandled") replaySignals();                             // t
+function callHandler(signal: string, arg: unknown): unknown {                           // t
+  const handler = handlers.get(signal);                                                 // t
+  if (!handler) throw new Error(`No handler for signal "${signal}"`);                   // t
+  return handler(arg);                                                                  // t
+}                                                                                       // t
 
-  const recorded = history[cursor];                                                   // e
-  if (!recorded) return undefined;                                                    // e
+// A signal landed at this exact point last time, so its handler runs here again.       // t
+function replaySignals(): void {                                                        // t
+  let event = history[cursor];                                                          // t
+  while (event?.type === "signalReceived") {                                            // t
+    const { signal, arg } = event;                                                      // t
+    cursor++;                                                                           // t
+    notify(event, true);                                                                // t
 
-  // An activity's result is what we're here to read, so it can't be compared.        // e
-  const { result } = recorded as { result?: unknown };                                // e
-  const actual = {                                                                    // e
-    ...recorded,                                                                      // e
-    seq: undefined,                                                                   // e
-    result: "result" in expected ? result : undefined,                                // e
-  };                                                                                  // e
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) {                          // e
-    throw new Error(                                                                  // e
-      `Nondeterminism at event #${recorded.seq}: history has ` +                      // e
-      `${JSON.stringify(actual)}, workflow did ${JSON.stringify(expected)}`,          // e
-    );                                                                                // e
-  }                                                                                   // e
+    const handled: Entry = {                                                            // t
+      type: "signalHandled",                                                            // t
+      signal,                                                                           // t
+      result: callHandler(signal, arg),                                                 // t
+    };                                                                                  // t
+    if (!replay(handled)) record(handled);                                              // e
+    event = history[cursor];                                                            // t
+  }                                                                                     // t
+}                                                                                       // t
 
-  cursor++;                                                                           // e
-  notify(recorded, true);                                                             // e
-  return recorded;                                                                    // e
-}                                                                                     // e
+// Returns the next recorded event if we're still replaying, otherwise undefined.       // e
+function replay(expected: Entry): HistoryEvent | undefined {                            // e
+  if (expected.type !== "signalHandled") replaySignals();                               // t
 
-function record(entry: Entry): void {                                                 // w
-  const event = { ...entry, seq: history.length + 1 };                                // w
-  history.push(event);                                                                // w
-  cursor++;                                                                           // w
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));                         // w
-  notify(event, false);                                                               // w
-}                                                                                     // w
+  const recorded = history[cursor];                                                     // e
+  if (!recorded) return undefined;                                                      // e
 
-export function onSignal<Arg>(                                                        // t
-  signal: string,                                                                     // t
-  handler: (arg: Arg) => unknown,                                                     // t
-): void {                                                                             // t
-  handlers.set(signal, handler);                                                      // t
-}                                                                                     // t
+  // An activity's result is what we're here to read, so it can't be compared.          // e
+  const { result } = recorded;                                                          // e
+  const actual = {                                                                      // e
+    ...recorded,                                                                        // e
+    seq: undefined,                                                                     // e
+    result: "result" in expected ? result : undefined,                                  // e
+  };                                                                                    // e
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {                            // e
+    throw new Error(                                                                    // e
+      `Nondeterminism at event #${recorded.seq}: history has ` +                        // e
+      `${JSON.stringify(actual)}, workflow did ${JSON.stringify(expected)}`,            // e
+    );                                                                                  // e
+  }                                                                                     // e
 
-export function sendSignal(signal: string, arg: unknown): void {                      // t
-  record({ type: "signalReceived", signal, arg });                                    // t
-  record({ type: "signalHandled", signal, result: callHandler(signal, arg) });        // t
-}                                                                                     // t
+  cursor++;                                                                             // e
+  notify(recorded, true);                                                               // e
+  return recorded;                                                                      // e
+}                                                                                       // e
 
-export async function callActivity<Args extends unknown[], Result>(                   // r
-  activity: (...args: Args) => Promise<Result>,                                       // r
-  args: Args,                                                                         // r
-): Promise<Result> {                                                                  // r
-  const started: Entry = { type: "activityStarted", activity: activity.name, args };  // r
-  if (!replay(started)) record(started);                                              // r
+function record(entry: Entry): void {                                                   // w
+  const event = { ...entry, seq: history.length + 1 };                                  // w
+  history.push(event);                                                                  // w
+  cursor++;                                                                             // w
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));                           // w
+  notify(event, false);                                                                 // w
+}                                                                                       // w
 
-  const completed: Entry = { type: "activityCompleted", activity: activity.name };    // r
-  const recorded = replay(completed);                                                 // r
-  if (recorded) return (recorded as typeof completed).result as Result;               // r
+export function onSignal<Arg>(                                                          // t
+  signal: string,                                                                       // t
+  handler: (arg: Arg) => unknown,                                                       // t
+): void {                                                                               // t
+  handlers.set(signal, handler);                                                        // t
+}                                                                                       // t
 
-  const result = await activity(...args);                                             // r
-  record({ ...completed, result });                                                   // r
-  return result;                                                                      // r
-}                                                                                     // r
+export function sendSignal(signal: string, arg: unknown): void {                        // t
+  record({ type: "signalReceived", signal, arg });                                      // t
+  record({ type: "signalHandled", signal, result: callHandler(signal, arg) });          // t
+}                                                                                       // t
 
-export async function run(                                                            // q
-  workflow: Workflow,                                                                 // q
-  output: (text: string) => void,                                                     // q
-  onEvent: OnEvent,                                                                   // q
-): Promise<void> {                                                                    // q
-  history = loadHistory();                                                            // w
-  cursor = 0;                                                                         // e
-  notify = onEvent;                                                                   // w
-  handlers.clear();                                                                   // t
+// Each command records the events it produces. A callActivity leaves two, one when it    // r
+// starts and one when it completes, so on replay both are read back from history.       // r
+export async function execute(                                                          // q
+  command: Command,                                                                     // q
+  output: (text: string) => void,                                                       // q
+): Promise<unknown> {                                                                   // q
+  switch (command.type) {                                                               // q
+    case "print":                                                                       // q
+      if (!replay(command)) {                                                           // e
+        output(command.text);                                                           // q
+        record(command);                                                                // w
+      }                                                                                 // q
+      return undefined;                                                                 // q
+    case "sleep":                                                                       // q
+      if (!replay(command)) {                                                           // e
+        await new Promise<void>((resolve) => setTimeout(resolve, command.ms));          // q
+        record(command);                                                                // w
+      }                                                                                 // q
+      return undefined;                                                                 // q
+    case "callActivity": {                                                              // r
+      const activity = command.activity.name;                                           // r
+      const started = { type: "activityStarted", activity, args: command.args } as const; // r
+      if (!replay(started)) record(started);                                            // r
 
-  for await (const command of workflow()) {                                           // q
-    if (!replay(command)) {                                                           // e
-      await execute(command, output);                                                 // q
-      record(command);                                                                // w
-    }                                                                                 // q
-  }                                                                                   // q
+      const recorded = replay({ type: "activityCompleted", activity });                 // e
+      if (recorded) return recorded.result;                                             // e
 
-  replaySignals();                                                                    // t
-  if (cursor < history.length) {                                                      // e
-    throw new Error(                                                                  // e
-      `Nondeterminism: workflow finished before event #${history[cursor].seq}`,       // e
-    );                                                                                // e
-  }                                                                                   // e
-}                                                                                     // q
+      const result = await command.activity(...command.args);                           // r
+      record({ type: "activityCompleted", activity, result });                          // r
+      return result;                                                                    // r
+    }                                                                                   // r
+  }                                                                                     // q
+}                                                                                       // q
+
+export async function run(                                                              // q
+  workflow: Workflow,                                                                   // q
+  output: (text: string) => void,                                                       // q
+  onEvent: OnEvent,                                                                     // q
+): Promise<void> {                                                                      // q
+  history = loadHistory();                                                              // w
+  cursor = 0;                                                                           // e
+  notify = onEvent;                                                                     // w
+  handlers.clear();                                                                     // t
+
+  const execution = workflow();                                                         // q
+  let next = await execution.next();                                                    // q
+  while (!next.done) {                                                                  // q
+    next = await execution.next(await execute(next.value, output));                     // q
+  }                                                                                     // q
+
+  replaySignals();                                                                      // t
+  if (cursor < history.length) {                                                        // e
+    throw new Error(                                                                    // e
+      `Nondeterminism: workflow finished before event #${history[cursor].seq}`,         // e
+    );                                                                                  // e
+  }                                                                                     // e
+}                                                                                       // q
