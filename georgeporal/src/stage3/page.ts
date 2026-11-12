@@ -13,19 +13,19 @@ const page = mountPage({
     {
       heading: "What's going on",
       body: [
-        "Same as before but now we simply store a history of our commands. The history panel shows events as they're recorded. Crash and reload and it's all still there.",
+        "Same as before, but now we simply store a history of our commands. The history panel shows events as they're recorded. Crash and reload and it's all still there.",
       ],
     },
     {
       heading: "How it maps to Temporal",
       body: [
-        "The event history is a central Temporal concept. It's an append-only log of everything that ever happened to it, and it lives on the Temporal server. The state of a workflow can always be recreated from its history and survives even crashed workers.",
+        "The event history is a central Temporal concept. It's an append-only log of everything that ever happened to it, and it lives on the Temporal server. The state of a workflow can always be recreated from its history, and the history survives even when workers crash.",
       ],
     },
     {
       heading: "That's a neat trick",
       body: [
-        "An audit log is really useful, you can kind of see the durability if you squint.",
+        "An audit log is really useful, and you can kind of see the durability if you squint.",
       ],
     },
   ],

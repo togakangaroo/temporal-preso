@@ -12,28 +12,28 @@ const page = mountPage({
   stage: 5,
   showHistory: true,
   blurb:
-    "Activities are plain async functions where non-deterministic work belongs. A workflow awaiting them through callActivity, allows georgeporal to record and memoize its results.",
+    "Activities are plain async functions. This is where non-deterministic work belongs. A workflow awaits them through callActivity, which lets georgeporal record and memoize the results.",
   tryThis:
     "crash, then Resume: the same random numbers come back without the activity running. Then change the args passed to callActivity and Resume again.",
   explainer: [
     {
       heading: "What's going on",
       body: [
-        "An activity is a plain async function, these are free to be non-deterministic, indeed ours just picks a random number. Rather than call the function directly, the workflow creates a `callActivity` command indicating that we would like to run that function. Our framework then runs the command recording `activityStarted` and `activityCompleted` events including the result.",
-        "On replay, `run` finds both events already in the history and treats the function call as memoized, returning back the recorded result; the function never runs after its first success. In this way, even non-deterministic code can fit into our scheme.",
+        "An activity is a plain async function. Activities are free to be non-deterministic, and ours just picks a random number. Rather than calling the function directly, the workflow creates a `callActivity` command saying it would like that function run. Our framework then runs the command, recording `activityStarted` and `activityCompleted` events, including the result.",
+        "On replay, `run` finds both events already in the history and treats the function call as memoized, returning the recorded result; the function never runs again after its first success. In this way, even non-deterministic code can fit into our scheme.",
       ],
     },
     {
       heading: "How it maps to Temporal",
       body: [
-        "This is the core split in Temporal. Workflows are deterministic orchestration, and activities are everything else: network calls, databases, randomness, anything that can fail or vary. An activity's result is stored in the Event History, and replay reads that result instead of running the activity again. Real activities also get retries and timeouts. You can hopefully see how implementing that becomes very easy for a system like this.",
+        "This is the core split in Temporal. Workflows are deterministic orchestration, and activities are everything else: network calls, databases, randomness, anything that can fail or vary. An activity's result is stored in the event history, and replay reads that result instead of running the activity again. Real activities also get retries and timeouts. You can hopefully see how easy that becomes in a system like this.",
       ],
     },
     {
       heading: "So that's it then?",
       body: [
         "Full durability, isn't that neat?",
-        "There's more though, lets see what else we can get this setup to do.",
+        "There's more, though. Let's see what else we can get this setup to do.",
       ],
     },
   ],

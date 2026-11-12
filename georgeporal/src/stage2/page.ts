@@ -5,15 +5,15 @@ import { fizzbuzzWorkflow } from "./workflow.js";
 const page = mountPage({
   stage: 2,
   blurb:
-  "The first compromise, the workflow is now an async generator that just describes commands it would like to take.",
+  "The first compromise: the workflow is now an async generator that just describes the commands it would like to take.",
   tryThis:
-  "Notice the page runs on the main thread with no worker now. The state is still only in the generator's locals, during a crash it's still lost.",
+  "Notice the page runs on the main thread with no worker now. The state still lives only in the generator's locals, so a crash still loses it.",
   explainer: [
     {
       heading: "What's going on",
       body: [
-        "The workflow is now an async generator. Instead of printing or sleeping itself, it yields commands: plain objects like `{ type: \"sleep\", ms: 1500 }` that describe what it wants done. The framework knows how to implement those commands and it just does so as the generator requests this.",
-        "Because we're asynchronous now sleeping can run on the built in event loop with a `setTimeout` now, so the whole thing runs comfortably on the main thread.",
+        "The workflow is now an async generator. Instead of printing or sleeping itself, it yields commands: plain objects like `{ type: \"sleep\", ms: 1500 }` that describe what it wants done. The framework knows how to carry out those commands, and does so as the generator requests them.",
+        "Because we're asynchronous now, sleeping can run on the built-in event loop with `setTimeout`, so the whole thing runs comfortably on the main thread.",
       ],
     },
     {
@@ -25,7 +25,7 @@ const page = mountPage({
     {
       heading: "This is just worse",
       body: [
-        "We've not gained any advantages yet, we've only made compromises.",
+        "We haven't gained any advantages yet. We've only made compromises.",
       ],
     },
   ],

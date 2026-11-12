@@ -10,7 +10,7 @@ const page = mountPage({
     {
       heading: "What's going on",
       body: [
-        "The workflow is an ordinary synchronous function. all the georgeporal framework does is call that function. Bing, bang boom. ",
+        "The workflow is an ordinary synchronous function. All the georgeporal framework does is call that function. Bing, bang, boom.",
 				"For proper abstraction the `print` method is passed in and the whole thing runs in a Web Worker. The workflow holds its thread for its whole life, with `sleep` spinning, so on the main thread the page could never repaint and you'd see nothing until all 1000 lines had finished.",
       ],
     },
