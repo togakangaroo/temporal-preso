@@ -26,6 +26,7 @@
 * Slide 4
 - This is a big enough problem that solutions are not new. Workflow software has existed in some form since cron in 1975
 - Workflows are code run on human time scales. This is different from a normal program
+  - useful for AI though. When you interact with claude code it's just running a process on your machine, thats not that useful when you're gong to shut down your computer, walk away, etc. Internal state has to be captured somewhere. In your context is not great on a VM is expensive
 - In order to make this work, tools like Airflow essentially force you design your workflow as individual mini-applications then express their control flow in declartive language that can be diagramed
 - The diagrams are nice for sure, but is it worth it? we already have a way of expressing control flow orchestration - code!
 - This is where temporeal wants to jump in and raise its hand and scream "we can do that", but of course, it is scary
@@ -42,4 +43,35 @@
 
 * Stage 2
 - We make our first compromise and this comes from our first insight.
-- Many workflow systems often force you to express control flow as 
+- Many workflow systems often force you to express control flow declaratively because the orchestrator needs to figure out what to run. Temporal has an insight - we don't need the orchestratior to know the whole DAG, it just needs a function that can tell it what the *next* thing to do
+- So here we use an async interator function and rather than running code like print and sleep directly we yield back a command object for it, then the workflow runs that
+- This doesn't help anything yet, we're just compromisin'
+
+* Stage 3
+- Same as before, but now we just store a permanent history of our commands. This is handy.
+- Audit logs are handy. Not the point but handy.
+- Ok, sometimes they're way more than handy
+
+* Stage 4
+- Now, when the workflow starts, we start running the workflow and as it gives us back each command we check that against our recorded history. This we find out how far the workflow ran
+- The compromise of determinism
+  - We had to get rid of the random sleep, we'll bring that back later
+- This is it. This is durability. In about 48 lines of code. All made possible by the fact that our workflow 
+- This also means that changes over time are hard
+- We can't always be deterministic though. If we could we'd all be using haskell. 
+
+* Stage 5
+- So lets bring back our randomness to demonstrate our point
+- The concept is an activity it is a regular async function. The only compromise we make is that rather than invoking it directly, we use this callActivity
+- In fact to demonstrate our point, lets implement our random function in a dumb way which throws an error sometimes.
+- Because the georgeporal code itself is what actually calls the activities, not the code itself we can do retries
+  - idempotency!
+  - store response
+- on replay we don't actually run those activities, since we already have the results
+
+* Stage 6
+- our workflow is long running and wee need to be able to take input from the world
+- this is why people get excited about this with ai
+
+* Stage 7
+- And now we're ready for distributed
