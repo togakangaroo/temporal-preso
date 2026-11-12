@@ -13,27 +13,27 @@ const page = mountPage({
   stage: 6,
   showHistory: true,
   blurb:
-    "Signals let the outside world reach into a running workflow. georgeporal records each one at the exact point in history it landed, along with its handler's result. Unlike an activity, a handler is not memoized: on replay it really runs again at that same point, because changing the workflow's local state is its whole job.",
+    "Signals let the outside world reach into a running workflow. Here they are modeled as event-style callbacks that are free to modify system state.",
   tryThis:
-    "while it's running, jump to 52, then crash and Resume. It comes back on the far side of the jump, because replay re-ran the handler.",
+    "while it's running, send a signal to jump to 500, then crash and Resume. It resumes right back where it was with the external signal recorded into the event history and replayed.",
   explainer: [
     {
       heading: "What's going on",
       body: [
-        "A signal is input from outside a running workflow, here the \"Jump to number\" button. `sendSignal` records `signalReceived` at whatever point in history it arrives, runs the workflow's registered handler, and records `signalHandled` with the result.",
-        "On replay, whenever the next event is a `signalReceived`, georgeporal runs the handler again at that exact point. Unlike an activity, the handler is not memoized: its whole job is changing the workflow's local state (`n`), and that state only exists if the handler really runs again during replay.",
+        "Workflows sell themselves as code running on human time scales. This requires a model for how the outside world can interact with the workflow state. A signal is exactly is. Here the \"Jump to number\" button. `sendSignal` records `signalReceived` at whatever point in history it arrives, runs the workflow's registered handler, and records `signalHandled` with the result.",
+        "On replay, a `signalReceived` is handled by running the handler again which allows it to change workflow state as it did on the first pass. Note this means that signal handlers *do* have to be deterministic.",
       ],
     },
     {
       heading: "How it maps to Temporal",
       body: [
-        "Temporal signals work the same way. Each one is appended to the history as a `WorkflowExecutionSignaled` event, and its handler is workflow code that re-runs on replay. That means handlers have to be deterministic too. Temporal also has queries for read-only access and updates for request/response.",
+        "You interact with temporal workflows in the the same way. For example, a workflow can encapsulate a patient's SMS confersation with an AI agent. A component in your infrastructure can receive a webhook from Twilio then use the Temporal SDK to trigger the corresponding signal on the patient's workflow. The signal handler records the message received into a local vairable and it is now available for your workflow code to make decisions about. Temporal also offers extensions on the concept with queries for read-only access and updates for request/response.",
       ],
     },
     {
-      heading: "What breaks",
+      heading: "We're almost there",
       body: [
-        "A handler has to be registered before its signal is replayed, and it must do the same thing every time. Signals also arrive while the workflow is in the middle of something, such as a sleep. Where a signal lands in the history is part of the history, and replay has to deliver it at exactly that spot.",
+        "We can now interact with the outside world and workflows can crash and restart durably. That's all we really need, but this setup has one more really useful trick up its sleeve.",
       ],
     },
   ],

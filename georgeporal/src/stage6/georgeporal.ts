@@ -110,11 +110,12 @@ export function onSignal<Arg>(                                                  
 
 export function sendSignal(signal: string, arg: unknown): void {                        // t
   record({ type: "signalReceived", signal, arg });                                      // t
-  record({ type: "signalHandled", signal, result: callHandler(signal, arg) });          // t
+  result = callHandler(signal, arg)
+  record({ type: "signalHandled", signal, result });                                    // t
 }                                                                                       // t
 
-// Each command records the events it produces. A callActivity leaves two, one when it    // r
-// starts and one when it completes, so on replay both are read back from history.       // r
+// Each command records the events it produces. A callActivity leaves two, one when it  // r
+// starts and one when it completes, so on replay both are read back from history.      // r
 export async function execute(                                                          // q
   command: Command,                                                                     // q
   output: (text: string) => void,                                                       // q
