@@ -25,3 +25,18 @@ waiting a random 1-2 seconds (a fixed 1.5 seconds in stage 4, so replay matches)
 
 Each page shows its own `workflow.ts` and `georgeporal.ts`, fetched live from
 `src/`, so what's on screen is the code that's running.
+
+## Credits
+
+Slide 2 clipart by [Creative Tail](https://commons.wikimedia.org/wiki/Category:Creative_Tail), licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Source files:
+
+- [Ghost](https://commons.wikimedia.org/wiki/File:Creative-Tail-Halloween-ghost.svg)
+- [Bat](https://commons.wikimedia.org/wiki/File:Creative-Tail-Halloween-bat.svg)
+- [Pumpkin](https://commons.wikimedia.org/wiki/File:Creative-Tail-Halloween-pumpkin.svg)
+- [Spider](https://commons.wikimedia.org/wiki/File:Creative-Tail-Halloween-spider.svg)
+- [Full moon](https://commons.wikimedia.org/wiki/File:Creative-Tail-Halloween-full-moon.svg)
+
+Slide 4 background, `slides/flowchart.png` (cropped), from
+[Nulab: How to create a workflow diagram](https://nulab.com/learn/project-management/how-to-create-workflow-diagram-and-why-you-should/),
+originally from [Wikipedia: Information Management - Help Desk](http://en.wikipedia.org/wiki/File:(1)_2008-04-07_Information_Management-_Help_Desk.jpg).
