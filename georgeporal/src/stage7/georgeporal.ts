@@ -183,12 +183,8 @@ export async function run(                                                      
   notify = onEvent;                                                                // w
   handlers.clear();                                                                // t
 
-  const execution = workflow();                                                    // q
-  let step = await execution.next();                                               // q
-
-  while (!step.done) {                                                             // q
-    await perform(step.value);                                                     // q
-    step = await execution.next();                                                 // q
+  for await (const command of workflow()) {                                        // q
+    await perform(command);                                                        // q
   }                                                                                // q
 
   replaySignals();                                                                 // t

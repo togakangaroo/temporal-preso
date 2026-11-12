@@ -6,28 +6,28 @@ const page = mountPage({
   stage: 3,
   showHistory: true,
   blurb:
-    "georgeporal now unwinds the generator by hand, recording every command it carries out to an event history in localStorage.",
+    "Now we start writing down everything that happens. Every command georgeporal carries out gets saved to an event history in localStorage.",
   tryThis:
-    "crash, and the history is still there. Press Start and it gets overwritten from 1: we've recorded everything but nothing reads it yet.",
+    "Let it run a bit, then crash. The history survives, but press Start and it gets overwritten from 1 anyway.",
   explainer: [
     {
       heading: "What's going on",
       body: [
-        "georgeporal stops using `for await` and steps the generator by hand with `execution.next()`. After carrying out each command, it appends `{ seq, command }` to an event history and writes the whole history to localStorage.",
-        "The history panel shows each event as it's recorded. After a crash, it's still there when the page loads, in italics.",
+        "We ditch the `for await` and step through the generator by hand with `execution.next()`. That gives us a spot between commands to do stuff. After running each command we append `{ seq, command }` to a history and shove the whole thing into localStorage.",
+        "The history panel shows events as they're recorded. Crash and reload and it's all still there, in italics.",
       ],
     },
     {
       heading: "How it maps to Temporal",
       body: [
-        "Every Temporal workflow execution has an Event History: an append-only log of everything that happened to it, kept by the Temporal server. That history, not any process's memory, is the source of truth for where a workflow is. Workers can come and go because the history stays.",
+        "Every Temporal workflow has an Event History. It's an append-only log of everything that ever happened to it, and it lives on the Temporal server. That log is the source of truth for where a workflow is, *not* whatever's in some process's memory. Workers can come and go all they want because the history sticks around.",
       ],
     },
     {
-      heading: "What breaks",
+      heading: "Still not useful",
       body: [
-        "We record everything and read nothing. Press Start after a crash and the history is overwritten from event #1.",
-        "Note too that the command runs before it's recorded. A crash in the gap between them means it runs a second time on the next attempt. That gap never fully goes away: it's why Temporal gives at-least-once guarantees for side effects, not exactly-once.",
+        "We write everything down and then never read it. Hit Start after a crash and we just start over and stomp on the old history.",
+        "Also notice we run the command *before* we record it. Crash in between and that command runs again next time. You can shrink that gap but you can never fully close it, which is why Temporal gives you at-least-once for side effects and not exactly-once.",
       ],
     },
   ],

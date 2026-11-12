@@ -78,15 +78,11 @@ export async function run(                                                      
   cursor = 0;                                                                         // e
   notify = onEvent;                                                                   // w
 
-  const execution = workflow();                                                       // q
-  let step = await execution.next();                                                  // q
-
-  while (!step.done) {                                                                // q
-    if (!replay(step.value)) {                                                        // e
-      await execute(step.value, output);                                              // q
-      record(step.value);                                                             // w
+  for await (const command of workflow()) {                                           // q
+    if (!replay(command)) {                                                           // e
+      await execute(command, output);                                                 // q
+      record(command);                                                                // w
     }                                                                                 // q
-    step = await execution.next();                                                    // q
   }                                                                                   // q
 
   if (cursor < history.length) {                                                      // e

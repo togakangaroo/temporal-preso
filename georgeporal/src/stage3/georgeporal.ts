@@ -37,17 +37,14 @@ export async function run(                                                     /
   onEvent: (event: HistoryEvent) => void,                                      // q
 ): Promise<void> {                                                             // q
   const history: HistoryEvent[] = [];                                          // w
-  const execution = workflow();                                                // q
 
-  let step = await execution.next();                                           // q
-  while (!step.done) {                                                         // q
-    await execute(step.value, output);                                         // q
+  for await (const command of workflow()) {                                    // q
+    await execute(command, output);                                            // q
 
-    const event = { seq: history.length + 1, command: step.value };            // w
+    const event = { seq: history.length + 1, command };                        // w
     history.push(event);                                                       // w
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));                // w
     onEvent(event);                                                            // w
-    step = await execution.next();                                             // q
   }                                                                            // q
 }                                                                              // q
 

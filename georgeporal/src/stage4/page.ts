@@ -14,7 +14,7 @@ const page = mountPage({
     {
       heading: "What's going on",
       body: [
-        "On Resume, georgeporal zips the stored history together with a brand-new run of the workflow. The workflow starts over from its first line, and for each command it yields, georgeporal checks it against the recorded event at that position. If they match, the command already happened, so it's skipped: no print, no sleep. Once the history runs out, georgeporal is caught up and starts carrying out commands for real again.",
+        "On Resume, georgeporal loads the stored history and starts a brand-new run of the workflow. The workflow starts over from its first line, and for each command it yields, georgeporal checks it against the recorded event at that position. If they match, the command already happened, so it's skipped: no print, no sleep. Once the history runs out, georgeporal is caught up and starts carrying out commands for real again.",
         "Re-running the code is what rebuilds the workflow's state. Nothing about `n` was ever saved. It comes back because the same code, fed the same history, reaches the same place.",
         "If a yielded command doesn't match the history, georgeporal throws a nondeterminism error. That's why the sleep is a fixed 1.5 seconds here. With `Math.random()`, replay would yield a different duration than the one recorded.",
       ],
