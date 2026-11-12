@@ -121,6 +121,7 @@ export function mountPage(options: PageOptions) {
     "nav",
     {},
     el("a", { href: "./index.html" }, "georgeporal"),
+    el("a", { href: "./slides/slide-1.html" }, "Slides start"),
     ...STAGES.map((name, i) =>
       el(
         "a",

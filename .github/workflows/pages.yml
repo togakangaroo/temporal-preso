@@ -33,7 +33,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site/node_modules/@highlightjs
-          cp -r *.html styles.css dist src _site/
+          cp -r *.html styles.css dist src slides _site/
           cp -r node_modules/@highlightjs/cdn-assets _site/node_modules/@highlightjs/
       - uses: actions/upload-pages-artifact@v5
         with:
