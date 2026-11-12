@@ -13,21 +13,19 @@ const page = mountPage({
     {
       heading: "What's going on",
       body: [
-        "We ditch the `for await` and step through the generator by hand with `execution.next()`. That gives us a spot between commands to do stuff. After running each command we append `{ seq, command }` to a history and shove the whole thing into localStorage.",
-        "The history panel shows events as they're recorded. Crash and reload and it's all still there, in italics.",
+        "Same as before but now we simply store a history of our commands. The history panel shows events as they're recorded. Crash and reload and it's all still there.",
       ],
     },
     {
       heading: "How it maps to Temporal",
       body: [
-        "Every Temporal workflow has an Event History. It's an append-only log of everything that ever happened to it, and it lives on the Temporal server. That log is the source of truth for where a workflow is, *not* whatever's in some process's memory. Workers can come and go all they want because the history sticks around.",
+        "The event history is a central Temporal concept. It's an append-only log of everything that ever happened to it, and it lives on the Temporal server. The state of a workflow can always be recreated from its history and survives even crashed workers.",
       ],
     },
     {
-      heading: "Still not useful",
+      heading: "That's a neat trick",
       body: [
-        "We write everything down and then never read it. Hit Start after a crash and we just start over and stomp on the old history.",
-        "Also notice we run the command *before* we record it. Crash in between and that command runs again next time. You can shrink that gap but you can never fully close it, which is why Temporal gives you at-least-once for side effects and not exactly-once.",
+        "An audit log is really useful, you can kind of see the durability if you squint.",
       ],
     },
   ],
