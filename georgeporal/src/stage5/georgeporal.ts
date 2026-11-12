@@ -9,20 +9,24 @@ export type Activity = (...args: any[]) => Promise<unknown>;                    
 export type Command =                                                                   // q
   | { type: "print"; text: string }                                                     // q
   | { type: "sleep"; ms: number }                                                       // q
-  | { type: "callActivity"; activity: Activity; args: unknown[] };                      // r
+  | { type: "callActivity"; activity: Activity; args: unknown[]; maxAttempts?: number }; // r
 
 export type Execution = AsyncGenerator<Command, void, any>;                             // q
 export type Workflow = () => Execution;                                                 // q
 
 export const print = (text: string): Command => ({ type: "print", text });              // q
 export const sleep = (ms: number): Command => ({ type: "sleep", ms });                  // q
-export const callActivity = (activity: Activity, args: unknown[]): Command =>           // r
-  ({ type: "callActivity", activity, args });                                           // r
+export const callActivity = (                                                           // r
+  activity: Activity,                                                                   // r
+  args: unknown[],                                                                      // r
+  { maxAttempts }: { maxAttempts?: number } = {},                                       // r
+): Command => ({ type: "callActivity", activity, args, maxAttempts });                  // r
 
 type Entry =                                                                            // w
   | { type: "print"; text: string }                                                     // q
   | { type: "sleep"; ms: number }                                                       // q
   | { type: "activityStarted"; activity: string; args: unknown[] }                      // r
+  | { type: "activityFailed"; activity: string; attempt: number }                       // r
   | { type: "activityCompleted"; activity: string; result?: unknown };                  // r
 
 export type HistoryEvent = Entry & { seq: number; result?: unknown };                   // w
@@ -57,7 +61,7 @@ function replay(expected: Entry): HistoryEvent | undefined {                    
   return recorded;                                                                      // e
 }                                                                                       // e
 
-function record(entry: Entry): void {                                                   // w
+function record(entry: Entry & { result?: unknown }): void {                            // w
   const event = { ...entry, seq: history.length + 1 };                                  // w
   history.push(event);                                                                  // w
   cursor++;                                                                             // w
@@ -65,8 +69,9 @@ function record(entry: Entry): void {                                           
   notify(event, false);                                                                 // w
 }                                                                                       // w
 
-// Each command records the events it produces. A callActivity leaves two, one when it  // r
-// starts and one when it completes, so on replay both are read back from history.     // r
+// Each command records the events it produces. A callActivity records one event when it  // r
+// starts, one for each failed attempt, and one when it completes. On replay all of them  // r
+// are read back from history, so the activity isn't run again.                           // r
 export async function execute(                                                          // q
   command: Command,                                                                     // q
   output: (text: string) => void,                                                       // q
@@ -86,15 +91,32 @@ export async function execute(                                                  
       return undefined;                                                                 // q
     case "callActivity": {                                                              // r
       const activity = command.activity.name;                                           // r
+      const maxAttempts = command.maxAttempts ?? Infinity;                              // r
       const started = { type: "activityStarted", activity, args: command.args } as const; // r
       if (!replay(started)) record(started);                                            // r
 
-      const recorded = replay({ type: "activityCompleted", activity });                 // e
-      if (recorded) return recorded.result;                                             // e
+      for (let attempt = 1; ; attempt++) {                                              // r
+        const failed = { type: "activityFailed", activity, attempt } as const;          // r
+        if (history[cursor]?.type === "activityFailed") {                               // e
+          const failure = replay(failed);                                               // e
+          if (attempt === maxAttempts) throw new Error(String(failure?.result));        // e
+          continue;                                                                     // e
+        }
 
-      const result = await command.activity(...command.args);                           // r
-      record({ type: "activityCompleted", activity, result });                          // r
-      return result;                                                                    // r
+        const recorded = replay({ type: "activityCompleted", activity });               // e
+        if (recorded) return recorded.result;                                           // e
+
+        let result: unknown;                                                            // r
+        try {                                                                           // r
+          result = await command.activity(...command.args);                             // r
+        } catch (error) {                                                               // r
+          record({ ...failed, result: String(error) });                                 // r
+          if (attempt === maxAttempts) throw error;                                     // r
+          continue;                                                                     // r
+        }                                                                               // r
+        record({ type: "activityCompleted", activity, result });                        // r
+        return result;                                                                  // r
+      }                                                                                 // r
     }                                                                                   // r
   }                                                                                     // q
 }                                                                                       // q

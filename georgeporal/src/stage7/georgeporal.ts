@@ -11,7 +11,7 @@ import { execute, type Command } from "../stage3/georgeporal.js";               
 // Anything a worker can be asked to do.                                           // y
 export type TaskCommand =                                                          // y
   | Command                                                                        // q
-  | { type: "callActivity"; activity: string; args: unknown[] };                   // r
+  | { type: "callActivity"; activity: string; args: unknown[]; maxAttempts?: number }; // r
 
 export type Execution = AsyncGenerator<TaskCommand, void, any>;                    // q
 export type Workflow = () => Execution;                                            // q
@@ -19,7 +19,7 @@ export type Workflow = () => Execution;                                         
 type Entry =                                                                       // w
   | TaskCommand                                                                    // y
   | { type: "taskStarted"; task: number; worker?: string }                         // y
-  | { type: "taskCompleted"; task: number; result?: unknown }                      // y
+  | { type: "taskCompleted"; task: number; result?: unknown; error?: string }     // y
   | { type: "signalReceived"; signal: string; arg: unknown };                      // t
 
 export type HistoryEvent = Entry & { seq: number; result?: unknown };              // w
@@ -54,8 +54,10 @@ export type Task = {                                                            
   command: TaskCommand;                                                            // y
   worker?: string;                                                                 // y
   startedAt?: number;                                                              // y
+  attempts?: number;                                                               // r
   done?: boolean;                                                                  // y
   result?: unknown;                                                                // y
+  error?: string;                                                                  // y
 };                                                                                 // y
 
 export function loadQueue(): Task[] {                                              // y
@@ -145,6 +147,12 @@ function replay(expected: Entry): HistoryEvent | undefined {                    
   return recorded;                                                                 // e
 }                                                                                  // e
 
+// A task that failed for good throws in the workflow, just as an activity would.  // r
+function outcome({ result, error }: { result?: unknown; error?: string }): unknown { // r
+  if (error) throw new Error(error);                                               // r
+  return result;                                                                   // r
+}
+
 // georgeporal no longer does anything itself. It schedules a task, then polls     // y
 // until some worker, in any tab, has done it. Each step is committed first, so    // y
 // if another tab already took it, this one starts over.                           // y
@@ -152,23 +160,23 @@ async function perform(command: TaskCommand): Promise<unknown> {                
   const task = (replay(command) ?? (await commit(command))).seq;                   // e
   let started = !!replay({ type: "taskStarted", task });                           // e
   const completed = started && replay({ type: "taskCompleted", task });            // e
-  if (completed) return completed.result;                                          // e
+  if (completed) return outcome(completed);                                        // e
 
   while (true) {                                                                   // y
     await pause(POLL_MS);                                                          // y
     if (loadHistory().length !== known) throw new Stale();                         // w
-    const { worker, done, result } = await queued(task, command);                  // y
+    const { worker, done, result, error } = await queued(task, command);           // y
     if (worker && !started) {                                                      // y
       started = true;                                                              // y
       await commit({ type: "taskStarted", task, worker });                         // w
     }                                                                              // y
     if (done) {                                                                    // y
-      await commit({ type: "taskCompleted", task, result });                       // w
+      await commit({ type: "taskCompleted", task, result, error });                // w
       await updateQueue((queue) => {                                               // y
         const index = queue.findIndex((t) => t.id === task);                       // y
         if (index !== -1) queue.splice(index, 1);                                  // y
       });                                                                          // y
-      return result;                                                               // y
+      return outcome({ result, error });                                             // y
     }                                                                              // y
   }                                                                                // y
 }                                                                                  // y
@@ -216,10 +224,11 @@ export const sendSignal = (signal: string, arg: unknown) =>                     
 
 // Only the activity's name goes on the queue. Whichever worker picks it up        // r
 // has to have registered an activity by that name.                                // r
-export const callActivity = (                                                      // r
+export const callActivity = (                                                     // r
   activity: (...args: any[]) => Promise<unknown>,                                  // r
   args: unknown[],                                                                 // r
-): TaskCommand => ({ type: "callActivity", activity: activity.name, args });       // r
+  { maxAttempts }: { maxAttempts?: number } = {},                                  // r
+): TaskCommand => ({ type: "callActivity", activity: activity.name, args, maxAttempts }); // r
 
 type Activities = Record<string, (...args: any[]) => Promise<unknown>>;            // r
 
@@ -235,17 +244,27 @@ function take(worker: string): Promise<Task | undefined> {                      
         !t.worker ||                                                               // y
         (!t.done && Date.now() - t.startedAt! > START_TO_CLOSE_TIMEOUT_MS),        // y
     );                                                                             // y
-    if (task) Object.assign(task, { worker, startedAt: Date.now() });              // y
+    if (task) Object.assign(task, { worker, startedAt: Date.now(), attempts: (task.attempts ?? 0) + 1 }); // r
     return task;                                                                   // y
   });                                                                              // y
 }                                                                                  // y
 
-function finish(id: number, result: unknown): Promise<void> {                      // y
+function finish(id: number, result: unknown, error?: string): Promise<void> {     // y
   return updateQueue((queue) => {                                                  // y
     const task = queue.find((t) => t.id === id);                                   // y
-    if (task) Object.assign(task, { done: true, result });                         // y
+    if (task) Object.assign(task, { done: true, result, error });                  // y
   });                                                                              // y
 }                                                                                  // y
+
+// A failed attempt goes back on the queue for any worker to take, unless it was the last one allowed. // r
+function fail(id: number, error: string, maxAttempts: number): Promise<void> {     // r
+  return updateQueue((queue) => {                                                  // r
+    const task = queue.find((t) => t.id === id);                                   // r
+    if (!task) return;                                                             // r
+    if (task.attempts! < maxAttempts) Object.assign(task, { worker: undefined, startedAt: undefined }); // r
+    else Object.assign(task, { done: true, error });                               // r
+  });                                                                              // r
+}                                                                                  // r
 
 export async function startWorker(                                                 // y
   name: string,                                                                    // y
@@ -260,10 +279,17 @@ export async function startWorker(                                              
     }                                                                              // y
 
     const { command } = task;                                                      // y
-    const result =                                                                 // y
-      command.type === "callActivity"                                              // y
-        ? await activities[command.activity](...command.args)                      // y
-        : await execute(command, output);                                          // y
-    await finish(task.id, result);                                                 // y
+    if (command.type !== "callActivity") {                                         // q
+      await finish(task.id, await execute(command, output));                       // q
+      continue;                                                                    // q
+    }
+    let result: unknown;                                                           // r
+    try {                                                                          // r
+      result = await activities[command.activity](...command.args);                // r
+    } catch (error) {                                                              // r
+      await fail(task.id, String(error), command.maxAttempts ?? Infinity);         // r
+      continue;                                                                    // r
+    }
+    await finish(task.id, result);                                                 // r
   }                                                                                // y
 }                                                                                  // y

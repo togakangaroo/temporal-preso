@@ -1,7 +1,10 @@
 import { callActivity, onSignal, print, sleep, type Execution } from "./georgeporal.js";
 
 async function generateRandomNumberActivity(min: number, max: number) {
-  return Math.round(min + Math.random() * (max - min));
+  const num = Math.round( Math.random() * max );
+  if (num < min)
+    throw Error("That math don't work")
+  return num
 }
 
 export async function* fizzbuzzWorkflow(): Execution {
@@ -18,7 +21,7 @@ export async function* fizzbuzzWorkflow(): Execution {
     else yield print(String(n));
     n++;
 
-    const ms: number = yield callActivity(generateRandomNumberActivity, [1000, 2000]);
+    const ms: number = yield callActivity(generateRandomNumberActivity, [500, 2000]);
     yield sleep(ms);
   }
 }

@@ -19,7 +19,7 @@ const page = mountPage({
     {
       heading: "What's going on",
       body: [
-        "An activity is a plain async function. Activities are free to be non-deterministic, and ours just picks a random number. Rather than calling the function directly, the workflow creates a `callActivity` command saying it would like that function run. Our framework then runs the command, recording `activityStarted` and `activityCompleted` events, including the result.",
+        "An activity is a plain async function. Activities are free to be non-deterministic, and ours just picks a random number. Rather than calling the function directly, the workflow creates a `callActivity` command saying it would like that function run. Our framework then runs the command, recording `activityStarted` and `activityCompleted` events, including the result. If there is an exception thrown then the activity doesn't complete and we retry.",
         "On replay, `run` finds both events already in the history and treats the function call as memoized, returning the recorded result; the function never runs again after its first success. In this way, even non-deterministic code can fit into our scheme.",
       ],
     },
