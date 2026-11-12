@@ -21,10 +21,8 @@ const page = mountPage({
   showHistory: true,
   showQueue: true,
   outputTitle: `Output from ${workerName}`,
-  blurb:
-    "georgeporal stops carrying out commands itself. Each one becomes a task on a queue in localStorage, and every open tab runs a worker that polls that queue ten times a second. Taking a task off the queue happens under a Web Lock, so two tabs can never grab the same one. A worker's start and finish go into the history as taskStarted and taskCompleted.",
-  tryThis:
-    "open this page in a second tab and leave it alone, then Start here. Each line prints in whichever tab's worker took the task. Crash the other tab mid-sleep: about 5 seconds later its task times out and a worker here takes it over.",
+  blurb: "We go full event-sourcing and split the event history from the commands. Commands get written into a task queue and a \"worker loop\" repeatedly polls it for things it can do next. A worker's start and finish go into the history as taskStarted and taskCompleted.",
+  tryThis: "Run this then open the page in a second tab and start there as well. Each line prints in whichever tab's worker took the task. Crash the other tab mid-sleep: about 5 seconds later its task times out and a worker here takes it over.",
   explainer: [
     {
       heading: "What's going on",
@@ -40,13 +38,13 @@ const page = mountPage({
       body: [
         "This is how Temporal actually runs work. The server never calls your code. Workers long-poll named task queues and pull work when they have room for it. To scale, you start more workers. To route work, you name queues. Workers can run anywhere that can reach the server.",
         "Temporal finds lost workers with timeouts: start-to-close, schedule-to-start and heartbeat timeouts. When one fires, the activity is retried somewhere else. So activities run at least once, which means they should be idempotent.",
-        "Two simplifications here. In real Temporal, workflow code also runs on workers, as workflow tasks, and is replayed on whichever worker picks it up. Here it stays in the tab that pressed Start. And sleeps are server-side timers, not tasks a worker has to wait out.",
+        "Two simplifications here. In real Temporal, workflow code also runs on workers, as workflow tasks, and is replayed on whichever worker picks it up. Here every tab that pressed Start replays the same history to keep its own copy of the workflow. And sleeps are server-side timers, not tasks a worker has to wait out.",
       ],
     },
     {
       heading: "What breaks",
       body: [
-        "Press Start in two tabs and you have two georgeporals writing one history. Temporal's server prevents that by owning the history and handing out one workflow task at a time. Also, a slow worker that isn't actually dead can still finish its task after the timeout has given it to someone else. That's the at-least-once caveat in action.",
+        "Press Start in two tabs and both replay one shared history. Each step is written only if no other tab has written since it last looked. A tab that loses that race throws away its copy of the workflow and replays from what's stored. Temporal's server does this job by owning the history. Here a localStorage key and a Web Lock stand in for it, so it's only as solid as one browser. Also, a slow worker that isn't actually dead can still finish its task after the timeout has given it to someone else. That's the at-least-once caveat in action.",
       ],
     },
   ],
@@ -90,11 +88,6 @@ const jump = page.addControl("Jump to number", () => {
 });
 jump.before(input);
 
-const setRunning = (running: boolean) => {
-  input.disabled = jump.disabled = !running;
-};
-setRunning(false);
-
 page.addControl("Clear history", () => {
   clearHistory(HISTORY_KEY);
   clearHistory(QUEUE_KEY);
@@ -108,15 +101,10 @@ if (stored.length > 0) {
   page.setStatus(`${stored.length} events in history`);
 }
 
-page.onStart(async () => {
-  setRunning(true);
-  try {
-    await run(fizzbuzzWorkflow, (event, replayed) => {
-      const className = replayed ? "replayed" : "";
-      page.addEvent(describe(event), className);
-      if (replayed && event.type === "print") page.print(event.text, className);
-    });
-  } finally {
-    setRunning(false);
-  }
-});
+page.onStart(() =>
+  run(fizzbuzzWorkflow, (event, replayed) => {
+    const className = replayed ? "replayed" : "";
+    page.addEvent(describe(event), className);
+    if (replayed && event.type === "print") page.print(event.text, className);
+  }),
+);

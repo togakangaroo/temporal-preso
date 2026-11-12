@@ -20,19 +20,32 @@ type Entry =                                                                    
   | TaskCommand                                                                    // y
   | { type: "taskStarted"; task: number; worker?: string }                         // y
   | { type: "taskCompleted"; task: number; result?: unknown }                      // y
-  | { type: "signalReceived"; signal: string; arg: unknown }                       // t
-  | { type: "signalHandled"; signal: string; result?: unknown };                   // t
+  | { type: "signalReceived"; signal: string; arg: unknown };                      // t
 
-export type HistoryEvent = Entry & { seq: number };                                // w
+export type HistoryEvent = Entry & { seq: number; result?: unknown };              // w
 type OnEvent = (event: HistoryEvent, replayed: boolean) => void;                   // w
-type SignalHandler = (arg: any) => unknown;                                        // t
 
 export const HISTORY_KEY = "georgeporal:stage7:history";                           // w
 export const QUEUE_KEY = "georgeporal:stage7:queue";                               // y
 export const POLL_MS = 100;                                                        // y
 
+export const pause = (ms: number) =>                                               // y
+  new Promise<void>((resolve) => setTimeout(resolve, ms));                         // y
+
 export function loadHistory(): HistoryEvent[] {                                    // w
   return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");                    // w
+}                                                                                  // w
+
+// Every tab appends under the same Web Lock. Given `expected`, it only writes if  // w
+// no other tab has written since this one last looked.                            // w
+function append(entry: Entry, expected?: number): Promise<HistoryEvent | undefined> { // w
+  return navigator.locks.request(HISTORY_KEY, () => {                              // w
+    const history = loadHistory();                                                 // w
+    if (expected !== undefined && history.length !== expected) return undefined;  // w
+    const event = { ...entry, seq: history.length + 1 };                           // w
+    localStorage.setItem(HISTORY_KEY, JSON.stringify([...history, event]));        // w
+    return event;                                                                  // w
+  });                                                                              // w
 }                                                                                  // w
 
 // The task queue: a localStorage key that every open tab shares.                  // y
@@ -60,34 +73,50 @@ export function updateQueue<T>(change: (queue: Task[]) => T): Promise<T> {      
   });                                                                              // y
 }                                                                                  // y
 
-export const pause = (ms: number) =>                                               // y
-  new Promise<void>((resolve) => setTimeout(resolve, ms));                         // y
+// Finds the task on the queue, putting it there first if it's missing, say        // y
+// because we crashed before queueing it.                                          // y
+function queued(task: number, command: TaskCommand): Promise<Task> {               // y
+  return updateQueue((queue) => {                                                  // y
+    let current = queue.find((t) => t.id === task);                                // y
+    if (!current) queue.push((current = { id: task, command }));                   // y
+    return current;                                                                // y
+  });                                                                              // y
+}                                                                                  // y
 
 let history: HistoryEvent[] = [];                                                  // w
 let cursor = 0;                                                                    // e
+// The history length as of this tab's last read or write.                         // w
+let known = 0;                                                                     // w
+let shown = 0;                                                                     // w
 let notify: OnEvent = () => {};                                                    // w
-const handlers = new Map<string, SignalHandler>();                                 // t
+const handlers = new Map<string, (arg: any) => unknown>();                         // t
 
-function callHandler(signal: string, arg: unknown): unknown {                      // t
-  const handler = handlers.get(signal);                                            // t
-  if (!handler) throw new Error(`No handler for signal "${signal}"`);              // t
-  return handler(arg);                                                             // t
-}                                                                                  // t
+// Thrown when another tab wrote to history first. The run starts over from there. // w
+class Stale extends Error {}                                                       // w
 
-// A signal landed at this exact point last time, so its handler runs here again.  // t
+// Appends an event this tab just decided on, unless another tab got there first.  // w
+async function commit(entry: Entry): Promise<HistoryEvent> {                       // w
+  const event = await append(entry, known);                                        // w
+  if (!event) throw new Stale();                                                   // w
+  known = event.seq;                                                               // w
+  announce(event, false);                                                          // w
+  return event;                                                                    // w
+}                                                                                  // w
+
+// A restart replays events this run already showed, so each is shown only once.   // w
+function announce(event: HistoryEvent, replayed: boolean): void {                  // w
+  if (event.seq <= shown) return;                                                  // w
+  shown = event.seq;                                                               // w
+  notify(event, replayed);                                                         // w
+}                                                                                  // w
+
+// A signal landed at this exact point in history, so its handler runs here again. // t
 function replaySignals(): void {                                                   // t
   let event = history[cursor];                                                     // t
   while (event?.type === "signalReceived") {                                       // t
-    const { signal, arg } = event;                                                 // t
     cursor++;                                                                      // t
-    notify(event, true);                                                           // t
-
-    const handled: Entry = {                                                       // t
-      type: "signalHandled",                                                       // t
-      signal,                                                                      // t
-      result: callHandler(signal, arg),                                            // t
-    };                                                                             // t
-    if (!replay(handled)) record(handled);                                         // e
+    announce(event, true);                                                         // t
+    handlers.get(event.signal)!(event.arg);                                        // t
     event = history[cursor];                                                       // t
   }                                                                                // t
 }                                                                                  // t
@@ -96,7 +125,7 @@ function replaySignals(): void {                                                
 // Only the fields the workflow already knows are compared: which worker ran a     // e
 // task and what it returned are what we're here to read.                          // e
 function replay(expected: Entry): HistoryEvent | undefined {                       // e
-  if (expected.type !== "signalHandled") replaySignals();                          // t
+  replaySignals();                                                                 // t
 
   const recorded = history[cursor];                                                // e
   if (!recorded) return undefined;                                                 // e
@@ -112,75 +141,43 @@ function replay(expected: Entry): HistoryEvent | undefined {                    
   }                                                                                // e
 
   cursor++;                                                                        // e
-  notify(recorded, true);                                                          // e
+  announce(recorded, true);                                                        // e
   return recorded;                                                                 // e
 }                                                                                  // e
 
-function record(entry: Entry): HistoryEvent {                                      // w
-  const event = { ...entry, seq: history.length + 1 };                             // w
-  history.push(event);                                                             // w
-  cursor++;                                                                        // w
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));                      // w
-  notify(event, false);                                                            // w
-  return event;                                                                    // w
-}                                                                                  // w
-
-// georgeporal no longer does anything itself. It puts a task on the queue,        // y
-// then polls until some worker, in any tab, has done it.                          // y
+// georgeporal no longer does anything itself. It schedules a task, then polls     // y
+// until some worker, in any tab, has done it. Each step is committed first, so    // y
+// if another tab already took it, this one starts over.                           // y
 async function perform(command: TaskCommand): Promise<unknown> {                   // y
-  const task = (replay(command) ?? record(command)).seq;                           // e
-
-  let started = replay({ type: "taskStarted", task });                             // e
+  const task = (replay(command) ?? (await commit(command))).seq;                   // e
+  let started = !!replay({ type: "taskStarted", task });                           // e
   const completed = started && replay({ type: "taskCompleted", task });            // e
-  if (completed) return (completed as { result?: unknown }).result;                // e
-
-  // If we crashed while this was in flight, it's already on the queue.            // y
-  await updateQueue((queue) => {                                                   // y
-    if (!queue.some((t) => t.id === task)) queue.push({ id: task, command });      // y
-  });                                                                              // y
+  if (completed) return completed.result;                                          // e
 
   while (true) {                                                                   // y
     await pause(POLL_MS);                                                          // y
-    const { worker, done, result } = loadQueue().find((t) => t.id === task)!;      // y
+    if (loadHistory().length !== known) throw new Stale();                         // w
+    const { worker, done, result } = await queued(task, command);                  // y
     if (worker && !started) {                                                      // y
-      started = record({ type: "taskStarted", task, worker });                     // w
+      started = true;                                                              // y
+      await commit({ type: "taskStarted", task, worker });                         // w
     }                                                                              // y
     if (done) {                                                                    // y
-      await updateQueue((queue) =>                                                 // y
-        queue.splice(queue.findIndex((t) => t.id === task), 1),                    // y
-      );                                                                           // y
-      record({ type: "taskCompleted", task, result });                             // w
+      await commit({ type: "taskCompleted", task, result });                       // w
+      await updateQueue((queue) => {                                               // y
+        const index = queue.findIndex((t) => t.id === task);                       // y
+        if (index !== -1) queue.splice(index, 1);                                  // y
+      });                                                                          // y
       return result;                                                               // y
     }                                                                              // y
   }                                                                                // y
 }                                                                                  // y
 
-export function onSignal<Arg>(                                                     // t
-  signal: string,                                                                  // t
-  handler: (arg: Arg) => unknown,                                                  // t
-): void {                                                                          // t
-  handlers.set(signal, handler);                                                   // t
-}                                                                                  // t
-
-export function sendSignal(signal: string, arg: unknown): void {                   // t
-  record({ type: "signalReceived", signal, arg });                                 // t
-  record({ type: "signalHandled", signal, result: callHandler(signal, arg) });     // t
-}                                                                                  // t
-
-// Only the activity's name goes on the queue. Whichever worker picks it up        // r
-// has to have registered an activity by that name.                                // r
-export const callActivity = (                                                      // r
-  activity: (...args: any[]) => Promise<unknown>,                                  // r
-  args: unknown[],                                                                 // r
-): TaskCommand => ({ type: "callActivity", activity: activity.name, args });       // r
-
-export async function run(                                                         // q
-  workflow: Workflow,                                                              // q
-  onEvent: OnEvent,                                                                // q
-): Promise<void> {                                                                 // q
+// One pass: replay whatever history holds, then carry on live from there.         // q
+async function runOnce(workflow: Workflow): Promise<void> {                        // q
   history = loadHistory();                                                         // w
+  known = history.length;                                                          // w
   cursor = 0;                                                                      // e
-  notify = onEvent;                                                                // w
   handlers.clear();                                                                // t
 
   const execution = workflow();                                                    // q
@@ -196,3 +193,30 @@ export async function run(                                                      
     );                                                                             // e
   }                                                                                // e
 }                                                                                  // q
+
+export async function run(workflow: Workflow, onEvent: OnEvent): Promise<void> {   // q
+  shown = 0;                                                                       // w
+  notify = onEvent;                                                                // w
+  while (true) {                                                                   // q
+    try {                                                                          // q
+      return await runOnce(workflow);                                              // q
+    } catch (error) {                                                              // q
+      if (!(error instanceof Stale)) throw error;                                  // q
+    }                                                                              // q
+  }                                                                                // q
+}                                                                                  // q
+
+export function onSignal<Arg>(signal: string, handler: (arg: Arg) => unknown) {    // t
+  handlers.set(signal, handler);                                                   // t
+}                                                                                  // t
+
+// Any tab can send a signal. Every running tab applies it when it next replays.   // t
+export const sendSignal = (signal: string, arg: unknown) =>                        // t
+  append({ type: "signalReceived", signal, arg });                                 // t
+
+// Only the activity's name goes on the queue. Whichever worker picks it up        // r
+// has to have registered an activity by that name.                                // r
+export const callActivity = (                                                      // r
+  activity: (...args: any[]) => Promise<unknown>,                                  // r
+  args: unknown[],                                                                 // r
+): TaskCommand => ({ type: "callActivity", activity: activity.name, args });       // r
