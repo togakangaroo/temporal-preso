@@ -12,16 +12,16 @@ const page = mountPage({
   stage: 5,
   showHistory: true,
   blurb:
-    "Activities are plain async functions, where non-deterministic work belongs. Workflows await them through callActivity, which records when one starts and what it returned. On replay the activity isn't run at all: the recorded result comes straight out of history.",
+    "Activities are plain async functions where non-deterministic work belongs. A workflow awaiting them through callActivity, allows georgeporal to record and memoize its results.",
   tryThis:
     "crash, then Resume: the same random numbers come back without the activity running. Then change the args passed to callActivity and Resume again.",
   explainer: [
     {
       heading: "What's going on",
       body: [
-        "An activity is a plain async function, here one that picks a random number. The workflow doesn't call it directly. It calls `callActivity(fn, args)`, which records `activityStarted` with the name and args, runs the function, then records `activityCompleted` with the result.",
-        "On replay, `callActivity` finds both events already in the history and returns the recorded result without running the function at all. The randomness happened once. Replay just reads back what it was.",
-        "`callActivity` is awaited rather than yielded, so it never passes through `run`'s loop. It reaches the running workflow's history through module-level state instead.",
+        "An activity is a plain async function, here one that picks a random number. The workflow doesn't call it directly. It yields `callActivity(fn, args)`, a command just like `print` and `sleep`. `execute` runs the function, and the result is recorded alongside the command.",
+        "On replay, `run` finds the command already in the history and hands back the recorded result without calling `execute`. The function never runs. The randomness happened once. Replay just reads back what it was.",
+        "The result comes back into the workflow through `yield` itself, so `const ms = yield callActivity(...)` gets the number.",
       ],
     },
     {
@@ -43,8 +43,8 @@ const page = mountPage({
   ],
 });
 
-function describe({ seq, ...command }: HistoryEvent): string {
-  return describeEvent({ seq, command });
+function describe({ seq, result, ...command }: HistoryEvent): string {
+  return describeEvent({ seq, command, result });
 }
 
 page.addControl("Clear history", () => {
