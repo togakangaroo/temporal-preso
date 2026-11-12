@@ -1,0 +1,40 @@
+* Slide 1
+
+- welcome
+- Me and my background as a software and cloud architect
+- Qventus
+- what background do people have? Who here is a coder?
+- temporal is a company and open source product giving a framework for event sourcing
+  - it's been getting a lot of buzz especially with how it pertains to AI tooling
+- My background with event sourcing and temporal
+
+* Slide 2
+- But like spirit-halloween scary. You think it's kinda dumb then you get in there and it's a surprising amount of depth and cool stuff. And if you're not careful you will trip over a harry potter wand, slip on a discarded sexy nurse apron, and a 9ft tall animatronic werewolf drops on your head
+- What I'm saying is that there's a teensy weensy bit of a learning curve
+- Because what temporal really is is a whole new paradigm for how to run code. It's a runtime that implements the old concept of workflows
+
+* Slide 3
+- Lets talk about these two premises. What does it mean for a workflow to be durable?
+  - recover from crashes
+  - Things can crash at any time don't pin to a specific instance
+  - The function can crash, the process can crash, the machine can crash, the infrastructure orchestrating your machines can crash, be resilient to that
+- And that brings us to the next point. If you can restart on a new machine, then you can restart on *multiple* machines.
+  - that's your cloud computing/distributed computing angle
+  - Use ECS or kubernetes, spin up 4 replicas and let them distribute work
+
+* Slide 4
+- This is a big enough problem that solutions are not new. Workflow software has existed in some form since cron in 1975
+- Workflows are code run on human time scales. This is different from a normal program
+- In order to make this work, tools like Airflow essentially force you design your workflow as individual mini-applications then express their control flow in declartive language that can be diagramed
+- The diagrams are nice for sure, but is it worth it? we already have a way of expressing control flow orchestration - code!
+- This is where temporeal wants to jump in and raise its hand and scream "we can do that", but of course, it is scary
+- I always find I can best understand systems by implementing them, so I guess lets implement temporal
+- A system needs a great catchy name or else no one will use it. So I will be calling what we create georgeporal
+
+* Stage 1
+- What's this code? What does it do?
+- This is the holy grail, the platonic ideal - our workflow is just a function and works!
+- This isn't durable, this isn't distributed. Lets start from here though and make small, reasonable compromises until we get something that is
+
+* Stage 2
+- We make our first comopromise
