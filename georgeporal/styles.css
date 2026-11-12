@@ -367,6 +367,13 @@ ol.stages li {
   letter-spacing: 0.02em;
 }
 
+.wonky {
+  font-family: "Chewy", cursive;
+  color: var(--good);
+  font-size: clamp(48px, 10vw, 120px);
+  transform: rotate(-4deg);
+}
+
 .backdrop {
   position: absolute;
   inset: 0;
