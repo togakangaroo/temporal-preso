@@ -4,9 +4,9 @@
 // e: replaying history
 // r: activities
 // t: signals
-// y: task queue
+// y: task queue and workers
 // </token_keys>
-import type { Command } from "../stage3/georgeporal.js";                           // q
+import { execute, type Command } from "../stage3/georgeporal.js";                  // q
 
 // Anything a worker can be asked to do.                                           // y
 export type TaskCommand =                                                          // y
@@ -220,3 +220,50 @@ export const callActivity = (                                                   
   activity: (...args: any[]) => Promise<unknown>,                                  // r
   args: unknown[],                                                                 // r
 ): TaskCommand => ({ type: "callActivity", activity: activity.name, args });       // r
+
+type Activities = Record<string, (...args: any[]) => Promise<unknown>>;            // r
+
+// A task still unfinished this long after a worker took it is assumed lost         // y
+// along with that worker (a crashed tab, say), so any worker may take it again.    // y
+const START_TO_CLOSE_TIMEOUT_MS = 5000;                                            // y
+
+// Under the lock, so two workers polling at once can't both take the same task.    // y
+function take(worker: string): Promise<Task | undefined> {                         // y
+  return updateQueue((queue) => {                                                  // y
+    const task = queue.find(                                                       // y
+      (t) =>                                                                       // y
+        !t.worker ||                                                               // y
+        (!t.done && Date.now() - t.startedAt! > START_TO_CLOSE_TIMEOUT_MS),        // y
+    );                                                                             // y
+    if (task) Object.assign(task, { worker, startedAt: Date.now() });              // y
+    return task;                                                                   // y
+  });                                                                              // y
+}                                                                                  // y
+
+function finish(id: number, result: unknown): Promise<void> {                      // y
+  return updateQueue((queue) => {                                                  // y
+    const task = queue.find((t) => t.id === id);                                   // y
+    if (task) Object.assign(task, { done: true, result });                         // y
+  });                                                                              // y
+}                                                                                  // y
+
+export async function startWorker(                                                 // y
+  name: string,                                                                    // y
+  activities: Activities,                                                          // y
+  output: (text: string) => void,                                                  // y
+): Promise<never> {                                                                // y
+  while (true) {                                                                   // y
+    const task = await take(name);                                                 // y
+    if (!task) {                                                                   // y
+      await pause(POLL_MS);                                                        // y
+      continue;                                                                    // y
+    }                                                                              // y
+
+    const { command } = task;                                                      // y
+    const result =                                                                 // y
+      command.type === "callActivity"                                              // y
+        ? await activities[command.activity](...command.args)                      // y
+        : await execute(command, output);                                          // y
+    await finish(task.id, result);                                                 // y
+  }                                                                                // y
+}                                                                                  // y
