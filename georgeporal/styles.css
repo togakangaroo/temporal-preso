@@ -133,6 +133,10 @@ button:disabled {
   color: var(--bad);
 }
 
+.status.server {
+  color: #f5d26b;
+}
+
 main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -190,6 +194,7 @@ pre .group-e { background: rgb(190 130 255 / 0.22); }
 pre .group-r { background: rgb(255 120 140 / 0.2); }
 pre .group-t { background: rgb(110 160 255 / 0.22); }
 pre .group-y { background: rgb(90 210 230 / 0.2); }
+pre .group-u { background: rgb(245 210 107 / 0.22); }
 
 /* Holding a group's letter in maximized code (see page.ts). */
 pre[data-focus="q"] .line:not(.group-q),
@@ -197,7 +202,8 @@ pre[data-focus="w"] .line:not(.group-w),
 pre[data-focus="e"] .line:not(.group-e),
 pre[data-focus="r"] .line:not(.group-r),
 pre[data-focus="t"] .line:not(.group-t),
-pre[data-focus="y"] .line:not(.group-y) {
+pre[data-focus="y"] .line:not(.group-y),
+pre[data-focus="u"] .line:not(.group-u) {
   opacity: 0.5;
 }
 

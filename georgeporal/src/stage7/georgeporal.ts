@@ -97,14 +97,15 @@ const advance = { type: "advanceWorkflow" } as const;                           
 
 // A message about an older step means history moved on while that worker was      // u
 // busy (a signal came in, say). A newer task is already queued, so drop it.       // u
-async function handle(message: Message): Promise<void> {                           // u
+async function handleMessageToServer(message: Message): Promise<void> {                           // u
   const history = loadHistory();                                                   // u
   switch (message.type) {                                                          // u
     case "startWorkflow":                                                          // u
       if (history.length === 0) await record({ type: "workflowStarted" }, advance); // u
       return;                                                                      // u
     case "signal":                                                                 // t
-      if (history.length > 0) await record({ type: "signalReceived", signal: message.signal, arg: message.arg }, advance); // t
+      if (history.length > 0)                                                      // t
+        await record({ type: "signalReceived", signal: message.signal, arg: message.arg }, advance); // t
       return;                                                                      // t
     case "workflowAdvanced":                                                       // u
       if (message.step === history.length) await record(message.command, message.command); // u
@@ -133,7 +134,7 @@ export function startServer(onServing: () => void): void {                      
         continue;                                                                  // u
       }                                                                            // u
       // Handled before it's removed, so a server that dies here loses nothing.    // u
-      await handle(message);                                                       // u
+      await handleMessageToServer(message);                                        // u
       await update<Message, void>(INBOX_KEY, (inbox) => { inbox.shift(); });       // u
     }                                                                              // u
   });                                                                              // u

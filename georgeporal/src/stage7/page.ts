@@ -70,7 +70,7 @@ function describeTask({ id, work, worker }: Task): string {
 
 page.setStatus(workerName);
 startServer(() => {
-  page.setStatus(`${workerName} + server`, "running");
+  page.setStatus(`${workerName} (server)`, "server");
   document.title = `${workerName} (server) · ${document.title}`;
 });
 startWorker(workerName, fizzbuzzWorkflow, { generateRandomNumberActivity }, page.print);
