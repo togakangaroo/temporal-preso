@@ -16,9 +16,9 @@ export async function* fizzbuzzWorkflow(): Execution {
   });
 
   while (true) {
-    if (n % 15 === 0) yield print("fizzbuzz");
-    else if (n % 3 === 0) yield print("fizz");
-    else if (n % 5 === 0) yield print("buzz");
+    if (n % 15 === 0) yield print(`${n}: fizzbuzz`);
+    else if (n % 3 === 0) yield print(`${n}: fizz`);
+    else if (n % 5 === 0) yield print(`${n}: buzz`);
     else yield print(String(n));
     n++;
 

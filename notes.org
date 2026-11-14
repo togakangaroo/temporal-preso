@@ -1,5 +1,4 @@
 * Slide 1
-
 - welcome
 - Me and my background as a software and cloud architect
 - Qventus
@@ -36,6 +35,8 @@
 * Slide 5
 - that's the name
 
+------------------------------------------------------
+  
 * Stage 1
 - Who recognizes this code? What does it do?
 - This is the holy grail, the platonic ideal - our workflow is just a function and works!

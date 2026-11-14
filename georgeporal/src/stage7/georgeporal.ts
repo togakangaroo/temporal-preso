@@ -5,6 +5,7 @@
 // r: activities
 // t: signals
 // y: task queue and workers
+// u: server
 // </token_keys>
 import { execute, type Command } from "../stage3/georgeporal.js";                  // q
 
@@ -17,16 +18,18 @@ export type Execution = AsyncGenerator<TaskCommand, void, any>;                 
 export type Workflow = () => Execution;                                            // q
 
 type Entry =                                                                       // w
+  | { type: "workflowStarted" }                                                    // w
   | TaskCommand                                                                    // y
-  | { type: "taskStarted"; task: number; worker?: string }                         // y
-  | { type: "taskCompleted"; task: number; result?: unknown; error?: string }     // y
-  | { type: "signalReceived"; signal: string; arg: unknown };                      // t
+  | { type: "taskCompleted"; task: number; result?: unknown; error?: string }      // y
+  | { type: "signalReceived"; signal: string; arg: unknown }                       // t
+  | { type: "workflowCompleted" };                                                 // w
 
 export type HistoryEvent = Entry & { seq: number; result?: unknown };              // w
-type OnEvent = (event: HistoryEvent, replayed: boolean) => void;                   // w
 
 export const HISTORY_KEY = "georgeporal:stage7:history";                           // w
 export const QUEUE_KEY = "georgeporal:stage7:queue";                               // y
+export const INBOX_KEY = "georgeporal:stage7:inbox";                               // u
+const SERVER_LOCK = "georgeporal:stage7:server";                                   // u
 export const POLL_MS = 100;                                                        // y
 
 export const pause = (ms: number) =>                                               // y
@@ -36,96 +39,127 @@ export function loadHistory(): HistoryEvent[] {                                 
   return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");                    // w
 }                                                                                  // w
 
-// Every tab appends under the same Web Lock. Given `expected`, it only writes if  // w
-// no other tab has written since this one last looked.                            // w
-function append(entry: Entry, expected?: number): Promise<HistoryEvent | undefined> { // w
-  return navigator.locks.request(HISTORY_KEY, () => {                              // w
-    const history = loadHistory();                                                 // w
-    if (expected !== undefined && history.length !== expected) return undefined;  // w
-    const event = { ...entry, seq: history.length + 1 };                           // w
-    localStorage.setItem(HISTORY_KEY, JSON.stringify([...history, event]));        // w
-    return event;                                                                  // w
-  });                                                                              // w
-}                                                                                  // w
-
 // The task queue: a localStorage key that every open tab shares.                  // y
 export type Task = {                                                               // y
-  id: number; // seq of the event that scheduled it                                // y
-  command: TaskCommand;                                                            // y
+  id: number; // seq of the history event that called for it                       // y
+  work: TaskCommand | { type: "advanceWorkflow" };                                 // y
   worker?: string;                                                                 // y
   startedAt?: number;                                                              // y
   attempts?: number;                                                               // r
-  done?: boolean;                                                                  // y
-  result?: unknown;                                                                // y
-  error?: string;                                                                  // y
 };                                                                                 // y
+
+// What workers (and the page) tell the server.                                    // u
+type Message =                                                                     // u
+  | { type: "startWorkflow" }                                                      // u
+  | { type: "signal"; signal: string; arg: unknown }                               // t
+  | { type: "workflowAdvanced"; step: number; command: TaskCommand }               // u
+  | { type: "workflowCompleted"; step: number }                                    // u
+  | { type: "commandCompleted"; task: number; result?: unknown; error?: string };  // u
 
 export function loadQueue(): Task[] {                                              // y
   return JSON.parse(localStorage.getItem(QUEUE_KEY) ?? "[]");                      // y
 }                                                                                  // y
 
+function loadInbox(): Message[] {                                                  // u
+  return JSON.parse(localStorage.getItem(INBOX_KEY) ?? "[]");                      // u
+}                                                                                  // u
+
 // Every change is a read-modify-write, and another tab could slip its own in      // y
 // between. The Web Lock is held across all tabs, so one goes at a time.           // y
-export function updateQueue<T>(change: (queue: Task[]) => T): Promise<T> {         // y
-  return navigator.locks.request(QUEUE_KEY, () => {                                // y
-    const queue = loadQueue();                                                     // y
-    const result = change(queue);                                                  // y
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));                        // y
+function update<Item, T>(key: string, change: (items: Item[]) => T): Promise<T> {  // y
+  return navigator.locks.request(key, () => {                                      // y
+    const items = JSON.parse(localStorage.getItem(key) ?? "[]");                   // y
+    const result = change(items);                                                  // y
+    localStorage.setItem(key, JSON.stringify(items));                              // y
     return result;                                                                 // y
   });                                                                              // y
 }                                                                                  // y
 
-// Finds the task on the queue, putting it there first if it's missing, say        // y
-// because we crashed before queueing it.                                          // y
-function queued(task: number, command: TaskCommand): Promise<Task> {               // y
-  return updateQueue((queue) => {                                                  // y
-    let current = queue.find((t) => t.id === task);                                // y
-    if (!current) queue.push((current = { id: task, command }));                   // y
-    return current;                                                                // y
-  });                                                                              // y
-}                                                                                  // y
+const send = (message: Message) =>                                                 // u
+  update<Message, void>(INBOX_KEY, (inbox) => { inbox.push(message); });           // u
 
-let history: HistoryEvent[] = [];                                                  // w
+export const startWorkflow = () => send({ type: "startWorkflow" });                // u
+
+// ----------------------------------------------------------------------------    // u
+// The server: the only thing that writes history or schedules tasks.              // u
+// ----------------------------------------------------------------------------    // u
+
+// Appends to history, and queues whatever work that event calls for. Only the     // u
+// server writes history, so this needs no lock.                                   // u
+async function record(entry: Entry, work?: Task["work"]): Promise<void> {          // u
+  const history = loadHistory();                                                   // w
+  const event = { ...entry, seq: history.length + 1 };                             // w
+  localStorage.setItem(HISTORY_KEY, JSON.stringify([...history, event]));          // w
+  if (work) await update<Task, void>(QUEUE_KEY, (queue) => { queue.push({ id: event.seq, work }); }); // y
+}                                                                                  // u
+
+const advance = { type: "advanceWorkflow" } as const;                              // u
+
+// A message about an older step means history moved on while that worker was      // u
+// busy (a signal came in, say). A newer task is already queued, so drop it.       // u
+async function handle(message: Message): Promise<void> {                           // u
+  const history = loadHistory();                                                   // u
+  switch (message.type) {                                                          // u
+    case "startWorkflow":                                                          // u
+      if (history.length === 0) await record({ type: "workflowStarted" }, advance); // u
+      return;                                                                      // u
+    case "signal":                                                                 // t
+      if (history.length > 0) await record({ type: "signalReceived", signal: message.signal, arg: message.arg }, advance); // t
+      return;                                                                      // t
+    case "workflowAdvanced":                                                       // u
+      if (message.step === history.length) await record(message.command, message.command); // u
+      return;                                                                      // u
+    case "workflowCompleted":                                                      // u
+      if (message.step === history.length) await record({ type: "workflowCompleted" }); // u
+      return;                                                                      // u
+    case "commandCompleted": {                                                     // u
+      const { task, result, error } = message;                                     // u
+      const done = history.some((e) => e.type === "taskCompleted" && e.task === task); // u
+      if (!done) await record({ type: "taskCompleted", task, result, error }, advance); // u
+      return;                                                                      // u
+    }                                                                              // u
+  }                                                                                // u
+}                                                                                  // u
+
+// Every tab asks for the server lock, and only one gets it. It never lets go,     // u
+// so when that tab closes the browser hands the lock to the next tab in line.     // u
+export function startServer(onServing: () => void): void {                         // u
+  navigator.locks.request(SERVER_LOCK, async () => {                               // u
+    onServing();                                                                   // u
+    while (true) {                                                                 // u
+      const [message] = loadInbox();                                               // u
+      if (!message) {                                                              // u
+        await pause(POLL_MS);                                                      // u
+        continue;                                                                  // u
+      }                                                                            // u
+      // Handled before it's removed, so a server that dies here loses nothing.    // u
+      await handle(message);                                                       // u
+      await update<Message, void>(INBOX_KEY, (inbox) => { inbox.shift(); });       // u
+    }                                                                              // u
+  });                                                                              // u
+}                                                                                  // u
+
+// ----------------------------------------------------------------------------    // y
+// Workers: run workflow code and commands, and report back to the server.         // y
+// ----------------------------------------------------------------------------    // y
+
+let history: HistoryEvent[] = [];                                                  // e
 let cursor = 0;                                                                    // e
-// The history length as of this tab's last read or write.                         // w
-let known = 0;                                                                     // w
-let shown = 0;                                                                     // w
-let notify: OnEvent = () => {};                                                    // w
 const handlers = new Map<string, (arg: any) => unknown>();                         // t
-
-// Thrown when another tab wrote to history first. The run starts over from there. // w
-class Stale extends Error {}                                                       // w
-
-// Appends an event this tab just decided on, unless another tab got there first.  // w
-async function commit(entry: Entry): Promise<HistoryEvent> {                       // w
-  const event = await append(entry, known);                                        // w
-  if (!event) throw new Stale();                                                   // w
-  known = event.seq;                                                               // w
-  announce(event, false);                                                          // w
-  return event;                                                                    // w
-}                                                                                  // w
-
-// A restart replays events this run already showed, so each is shown only once.   // w
-function announce(event: HistoryEvent, replayed: boolean): void {                  // w
-  if (event.seq <= shown) return;                                                  // w
-  shown = event.seq;                                                               // w
-  notify(event, replayed);                                                         // w
-}                                                                                  // w
 
 // A signal landed at this exact point in history, so its handler runs here again. // t
 function replaySignals(): void {                                                   // t
   let event = history[cursor];                                                     // t
   while (event?.type === "signalReceived") {                                       // t
     cursor++;                                                                      // t
-    announce(event, true);                                                         // t
     handlers.get(event.signal)!(event.arg);                                        // t
     event = history[cursor];                                                       // t
   }                                                                                // t
 }                                                                                  // t
 
 // Returns the next recorded event if we're still replaying, otherwise undefined.  // e
-// Only the fields the workflow already knows are compared: which worker ran a     // e
-// task and what it returned are what we're here to read.                          // e
+// Only the fields the workflow already knows are compared: what a task            // e
+// returned is what we're here to read.                                            // e
 function replay(expected: Entry): HistoryEvent | undefined {                       // e
   replaySignals();                                                                 // t
 
@@ -143,7 +177,6 @@ function replay(expected: Entry): HistoryEvent | undefined {                    
   }                                                                                // e
 
   cursor++;                                                                        // e
-  announce(recorded, true);                                                        // e
   return recorded;                                                                 // e
 }                                                                                  // e
 
@@ -153,45 +186,23 @@ function outcome({ result, error }: { result?: unknown; error?: string }): unkno
   return result;                                                                   // r
 }
 
-// georgeporal no longer does anything itself. It schedules a task, then polls     // y
-// until some worker, in any tab, has done it. Each step is committed first, so    // y
-// if another tab already took it, this one starts over.                           // y
-async function perform(command: TaskCommand): Promise<unknown> {                   // y
-  const task = (replay(command) ?? (await commit(command))).seq;                   // e
-  let started = !!replay({ type: "taskStarted", task });                           // e
-  const completed = started && replay({ type: "taskCompleted", task });            // e
-  if (completed) return outcome(completed);                                        // e
-
-  while (true) {                                                                   // y
-    await pause(POLL_MS);                                                          // y
-    if (loadHistory().length !== known) throw new Stale();                         // w
-    const { worker, done, result, error } = await queued(task, command);           // y
-    if (worker && !started) {                                                      // y
-      started = true;                                                              // y
-      await commit({ type: "taskStarted", task, worker });                         // w
-    }                                                                              // y
-    if (done) {                                                                    // y
-      await commit({ type: "taskCompleted", task, result, error });                // w
-      await updateQueue((queue) => {                                               // y
-        const index = queue.findIndex((t) => t.id === task);                       // y
-        if (index !== -1) queue.splice(index, 1);                                  // y
-      });                                                                          // y
-      return outcome({ result, error });                                             // y
-    }                                                                              // y
-  }                                                                                // y
-}                                                                                  // y
-
-// One pass: replay whatever history holds, then carry on live from there.         // q
-async function runOnce(workflow: Workflow): Promise<void> {                        // q
-  history = loadHistory();                                                         // w
-  known = history.length;                                                          // w
-  cursor = 0;                                                                      // e
+// A workflow task: replay history up to `step` from scratch, then report the      // e
+// one new command the workflow wants. If it's still waiting on a task that        // e
+// hasn't finished, there's nothing to report.                                     // e
+async function advanceWorkflow(workflow: Workflow, step: number): Promise<Message | undefined> { // e
+  history = loadHistory().slice(0, step);                                          // e
+  cursor = 1; // past workflowStarted                                              // e
   handlers.clear();                                                                // t
 
   const execution = workflow();                                                    // q
   let next = await execution.next();                                               // q
   while (!next.done) {                                                             // q
-    next = await execution.next(await perform(next.value));                        // q
+    const command = next.value;                                                    // q
+    const scheduled = replay(command);                                             // e
+    if (!scheduled) return { type: "workflowAdvanced", step, command };            // u
+    const completed = replay({ type: "taskCompleted", task: scheduled.seq });      // e
+    if (!completed) return undefined;                                              // e
+    next = await execution.next(outcome(completed));                               // q
   }                                                                                // q
 
   replaySignals();                                                                 // t
@@ -200,31 +211,19 @@ async function runOnce(workflow: Workflow): Promise<void> {                     
       `Nondeterminism: workflow finished before event #${history[cursor].seq}`,    // e
     );                                                                             // e
   }                                                                                // e
-}                                                                                  // q
+  return { type: "workflowCompleted", step };                                      // u
+}                                                                                  // e
 
-export async function run(workflow: Workflow, onEvent: OnEvent): Promise<void> {   // q
-  shown = 0;                                                                       // w
-  notify = onEvent;                                                                // w
-  while (true) {                                                                   // q
-    try {                                                                          // q
-      return await runOnce(workflow);                                              // q
-    } catch (error) {                                                              // q
-      if (!(error instanceof Stale)) throw error;                                  // q
-    }                                                                              // q
-  }                                                                                // q
-}                                                                                  // q
+export const sendSignal = (signal: string, arg: unknown) =>                        // t
+  send({ type: "signal", signal, arg });                                           // t
 
 export function onSignal<Arg>(signal: string, handler: (arg: Arg) => unknown) {    // t
   handlers.set(signal, handler);                                                   // t
 }                                                                                  // t
 
-// Any tab can send a signal. Every running tab applies it when it next replays.   // t
-export const sendSignal = (signal: string, arg: unknown) =>                        // t
-  append({ type: "signalReceived", signal, arg });                                 // t
-
 // Only the activity's name goes on the queue. Whichever worker picks it up        // r
 // has to have registered an activity by that name.                                // r
-export const callActivity = (                                                     // r
+export const callActivity = (                                                      // r
   activity: (...args: any[]) => Promise<unknown>,                                  // r
   args: unknown[],                                                                 // r
   { maxAttempts }: { maxAttempts?: number } = {},                                  // r
@@ -232,42 +231,63 @@ export const callActivity = (                                                   
 
 type Activities = Record<string, (...args: any[]) => Promise<unknown>>;            // r
 
-// A task still unfinished this long after a worker took it is assumed lost         // y
-// along with that worker (a crashed tab, say), so any worker may take it again.    // y
+// A task still unfinished this long after a worker took it is assumed lost        // y
+// along with that worker (a crashed tab, say), so any worker may take it again.   // y
 const START_TO_CLOSE_TIMEOUT_MS = 5000;                                            // y
 
-// Under the lock, so two workers polling at once can't both take the same task.    // y
+// Under the lock, so two workers polling at once can't both take the same task.   // y
 function take(worker: string): Promise<Task | undefined> {                         // y
-  return updateQueue((queue) => {                                                  // y
+  return update<Task, Task | undefined>(QUEUE_KEY, (queue) => {                    // y
     const task = queue.find(                                                       // y
-      (t) =>                                                                       // y
-        !t.worker ||                                                               // y
-        (!t.done && Date.now() - t.startedAt! > START_TO_CLOSE_TIMEOUT_MS),        // y
+      (t) => !t.worker || Date.now() - t.startedAt! > START_TO_CLOSE_TIMEOUT_MS,   // y
     );                                                                             // y
     if (task) Object.assign(task, { worker, startedAt: Date.now(), attempts: (task.attempts ?? 0) + 1 }); // r
     return task;                                                                   // y
   });                                                                              // y
 }                                                                                  // y
 
-function finish(id: number, result: unknown, error?: string): Promise<void> {     // y
-  return updateQueue((queue) => {                                                  // y
-    const task = queue.find((t) => t.id === id);                                   // y
-    if (task) Object.assign(task, { done: true, result, error });                  // y
+// Tell the server first: if we die before the task is off the queue, it just      // y
+// runs again, and the server ignores the repeat.                                  // y
+async function finish(id: number, message?: Message): Promise<void> {              // y
+  if (message) await send(message);                                                // y
+  await update<Task, void>(QUEUE_KEY, (queue) => {                                 // y
+    const index = queue.findIndex((t) => t.id === id);                             // y
+    if (index !== -1) queue.splice(index, 1);                                      // y
   });                                                                              // y
 }                                                                                  // y
 
 // A failed attempt goes back on the queue for any worker to take, unless it was the last one allowed. // r
-function fail(id: number, error: string, maxAttempts: number): Promise<void> {     // r
-  return updateQueue((queue) => {                                                  // r
-    const task = queue.find((t) => t.id === id);                                   // r
-    if (!task) return;                                                             // r
-    if (task.attempts! < maxAttempts) Object.assign(task, { worker: undefined, startedAt: undefined }); // r
-    else Object.assign(task, { done: true, error });                               // r
+async function fail(task: Task, error: string, maxAttempts: number): Promise<void> { // r
+  if (task.attempts! >= maxAttempts) {                                             // r
+    return finish(task.id, { type: "commandCompleted", task: task.id, error });    // r
+  }                                                                                // r
+  await update<Task, void>(QUEUE_KEY, (queue) => {                                 // r
+    const current = queue.find((t) => t.id === task.id);                           // r
+    if (current) Object.assign(current, { worker: undefined, startedAt: undefined }); // r
   });                                                                              // r
 }                                                                                  // r
 
+async function perform(task: Task, workflow: Workflow, activities: Activities, output: (text: string) => void) { // y
+  const { id, work } = task;                                                       // y
+  if (work.type === "advanceWorkflow") {                                           // e
+    return finish(id, await advanceWorkflow(workflow, id));                        // e
+  }                                                                                // e
+  if (work.type !== "callActivity") {                                              // q
+    const result = await execute(work, output);                                    // q
+    return finish(id, { type: "commandCompleted", task: id, result });             // q
+  }                                                                                // q
+  let result: unknown;                                                             // r
+  try {                                                                            // r
+    result = await activities[work.activity](...work.args);                        // r
+  } catch (error) {                                                                // r
+    return fail(task, String(error), work.maxAttempts ?? Infinity);                // r
+  }                                                                                // r
+  await finish(id, { type: "commandCompleted", task: id, result });                // r
+}                                                                                  // y
+
 export async function startWorker(                                                 // y
   name: string,                                                                    // y
+  workflow: Workflow,                                                              // y
   activities: Activities,                                                          // y
   output: (text: string) => void,                                                  // y
 ): Promise<never> {                                                                // y
@@ -277,19 +297,8 @@ export async function startWorker(                                              
       await pause(POLL_MS);                                                        // y
       continue;                                                                    // y
     }                                                                              // y
-
-    const { command } = task;                                                      // y
-    if (command.type !== "callActivity") {                                         // q
-      await finish(task.id, await execute(command, output));                       // q
-      continue;                                                                    // q
-    }
-    let result: unknown;                                                           // r
-    try {                                                                          // r
-      result = await activities[command.activity](...command.args);                // r
-    } catch (error) {                                                              // r
-      await fail(task.id, String(error), command.maxAttempts ?? Infinity);         // r
-      continue;                                                                    // r
-    }
-    await finish(task.id, result);                                                 // r
+    // A task that blows up (nondeterminism, say) stays on the queue, and is       // y
+    // retried once it times out.                                                  // y
+    await perform(task, workflow, activities, output).catch((error) => output(String(error))); // y
   }                                                                                // y
 }                                                                                  // y

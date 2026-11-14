@@ -175,6 +175,7 @@ export function mountPage(options: PageOptions) {
 
   return {
     setStatus,
+    start,
     setStartLabel: (label: string) => (start.textContent = label),
     addControl(label: string, onClick: () => void) {
       const button = el("button", {}, label);
